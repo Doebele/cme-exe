@@ -62,7 +62,8 @@
     "bootMode": "first-visit",
     "speedrunDurationSec": 60,
     "perRunSharing": true,
-    "mobileVariant": true
+    "mobileVariant": true,
+    "gameVariant": "asteroids"
   },
   "experience": {
     "hybridRateLimitPerHour": 20,

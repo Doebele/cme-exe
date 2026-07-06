@@ -31,12 +31,15 @@ export interface AudioBlock {
   tracks: Record<string, number>;
 }
 
+export type GameVariant = "asteroids" | "invaders";
+
 export interface BehaviorBlock {
   bootMode: BootMode;
   speedrunDurationSeconds: number;
   perRunSharing: boolean;
   mobileTiktokVariant: boolean;
   hybridRateLimitPerHour: number;
+  gameVariant: GameVariant;
 }
 
 export interface ExperienceBlock {

@@ -4,6 +4,7 @@ import type {
   BehaviorBlock,
   ExperienceBlock,
   BootMode,
+  GameVariant,
 } from "../AdminShared";
 import {
   AdminCard,
@@ -22,6 +23,7 @@ const DEFAULT_BEHAVIOR: BehaviorBlock = {
   perRunSharing: true,
   mobileTiktokVariant: true,
   hybridRateLimitPerHour: 20,
+  gameVariant: "asteroids",
 };
 
 const DEFAULT_EXPERIENCE: ExperienceBlock = {
@@ -129,6 +131,24 @@ export default function BehaviorTab() {
             disabled={isSaving}
           />
         </div>
+      </AdminCard>
+
+      <AdminCard title="Designer's Quest — game variant">
+        <RadioGroup<GameVariant>
+          label="Game"
+          value={behavior.gameVariant}
+          options={[
+            { value: "asteroids", label: "Asteroids (classic)" },
+            { value: "invaders", label: "Space Invaders (marching formation)" },
+          ]}
+          onChange={(v) => setB("gameVariant", v)}
+          disabled={isSaving}
+        />
+        <p className="admin-field-row__hint font-display">
+          Switches the play style in the Quest section. Asteroids keeps the
+          free-roaming original; Invaders is a marching-formation homage with
+          barriers, bombs, and the same design-quote drops.
+        </p>
       </AdminCard>
 
       <AdminCard title="AI modes">

@@ -1,20 +1,56 @@
 import { useEffect, useRef, useState } from "react";
 import GameCanvas from "../components/quest/GameCanvas";
+import InvadersCanvas from "../components/quest/InvadersCanvas";
 import { useAsteroids } from "../hooks/useAsteroids";
 import type { DesignQuote } from "../types";
 
 // ---------------------------------------------------------------------------
-// Designer's Quest — Asteroids Easter egg. Player shoots design problems;
-// every small-asteroid kill has a 30% chance to surface a designer's note.
-// All game state lives in useAsteroids; GameCanvas drives the per-frame loop.
+// Designer's Quest — playable Easter egg. Player shoots design problems; a
+// fraction of kills surface a designer's micro-quote. The admin can switch
+// the play style between Asteroids (free-roaming original) and Space Invaders
+// (marching formation homage) via settings.behavior.gameVariant.
 // ---------------------------------------------------------------------------
+
+type GameVariant = "asteroids" | "invaders";
+
+let cachedGameVariant: GameVariant | null = null;
+let gameVariantPromise: Promise<GameVariant> | null = null;
+
+function fetchGameVariant(): Promise<GameVariant> {
+  if (cachedGameVariant) return Promise.resolve(cachedGameVariant);
+  if (gameVariantPromise) return gameVariantPromise;
+  gameVariantPromise = fetch("/api/content/settings")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data: { behavior?: { gameVariant?: GameVariant } } | null) => {
+      const v = data?.behavior?.gameVariant ?? "asteroids";
+      cachedGameVariant = v;
+      return v;
+    })
+    .catch(() => {
+      cachedGameVariant = "asteroids";
+      return cachedGameVariant;
+    });
+  return gameVariantPromise;
+}
 
 export default function QuestSection() {
   const game = useAsteroids();
   const { status, score, lives, highScore, level } = game;
   const [quotes, setQuotes] = useState<DesignQuote[]>([]);
   const [quotesError, setQuotesError] = useState(false);
+  const [gameVariant, setGameVariant] = useState<GameVariant>("asteroids");
   const sectionRef = useRef<HTMLElement | null>(null);
+
+  // Resolve which game to render from admin settings.
+  useEffect(() => {
+    let active = true;
+    void fetchGameVariant().then((v) => {
+      if (active) setGameVariant(v);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Fetch the design-quote pool once on mount. GameCanvas caches it via ref.
   useEffect(() => {
@@ -88,9 +124,16 @@ export default function QuestSection() {
               <pre className="quest-start__ascii" aria-hidden>{"            .--.\n           /    \\\n          |      |\n           \\____/"}</pre>
               <div>
                 <p className="font-display text-sm text-text-secondary mb-4 leading-relaxed">
-                  Rotate with <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd>.
-                  Thrust with <kbd>W</kbd>/<kbd>↑</kbd>. Fire with <kbd>SPACE</kbd>.
-                  Pause with <kbd>P</kbd>/<kbd>ESC</kbd>.
+                  {gameVariant === "invaders"
+                    ? <>
+                        Move with <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd>.
+                        Fire with <kbd>SPACE</kbd>. Pause with <kbd>P</kbd>/<kbd>ESC</kbd>.
+                      </>
+                    : <>
+                        Rotate with <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd>.
+                        Thrust with <kbd>W</kbd>/<kbd>↑</kbd>. Fire with <kbd>SPACE</kbd>.
+                        Pause with <kbd>P</kbd>/<kbd>ESC</kbd>.
+                      </>}
                 </p>
                 <p className="font-display text-xs text-text-secondary/70 mb-6 leading-relaxed">
                   Every design problem you pop has a chance to drop a designer's
@@ -118,19 +161,32 @@ export default function QuestSection() {
           </div>
         )}
 
-        {/* PLAYING / PAUSED — the live canvas. */}
+        {/* PLAYING / PAUSED — the live canvas. Variant is admin-selectable. */}
         {(status === "playing" || status === "paused") && (
           <>
-            <GameCanvas
-              running={running}
-              paused={paused}
-              level={level}
-              onScore={game.addScore}
-              onLoseLife={game.loseLife}
-              onGameOver={game.endGame}
-              onLevelUp={game.levelUp}
-              quotes={quotes}
-            />
+            {gameVariant === "invaders" ? (
+              <InvadersCanvas
+                running={running}
+                paused={paused}
+                level={level}
+                onScore={game.addScore}
+                onLoseLife={game.loseLife}
+                onGameOver={game.endGame}
+                onLevelUp={game.levelUp}
+                quotes={quotes}
+              />
+            ) : (
+              <GameCanvas
+                running={running}
+                paused={paused}
+                level={level}
+                onScore={game.addScore}
+                onLoseLife={game.loseLife}
+                onGameOver={game.endGame}
+                onLevelUp={game.levelUp}
+                quotes={quotes}
+              />
+            )}
             {status === "paused" && (
               <div className="quest-overlay">
                 <p className="font-display text-xs uppercase tracking-[0.3em] text-text-secondary mb-6">
