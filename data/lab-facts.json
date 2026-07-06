@@ -1,0 +1,52 @@
+{
+  "version": "0.1.0",
+  "subject": {
+    "name": "Claus Medvesek",
+    "role": "Senior UX/UI Designer, Head of Design",
+    "location": "Zürich, Switzerland",
+    "email": "claus@medvesek.com",
+    "linkedin": "https://www.linkedin.com/in/claus-medvesek/",
+    "certifications": [
+      {
+        "title": "UX Master Certificate",
+        "issuer": "Nielsen Norman Group",
+        "id": "#1067965",
+        "date": "November 2025",
+        "specialties": [
+          "Facilitating UX Workshops",
+          "Design Tradeoffs and Decision-Making",
+          "Discovery Research",
+          "AI for Design Workflows",
+          "Accelerating Research with AI"
+        ]
+      }
+    ]
+  },
+  "career": [
+    { "year": "1995", "title": "Freelance Screen Designer", "company": "Various (München, Walldorf, Zürich)", "details": "Freelance für Schilling & Partner, Publicis MCD, SAP AG, Eclat AG" },
+    { "year": "1996", "title": "Interaction Design Director & Projektleiter", "company": "Eclat AG, Erlenbach", "details": "Leitung von Design-Projekten, Interaction Design" },
+    { "year": "2000", "title": "Media and Interaction Designer", "company": "MetaDesign, San Francisco", "details": "Digitale Medien und Interaktionsdesign im Silicon Valley" },
+    { "year": "2001", "title": "Senior Interaction Designer", "company": "NOSE Design Intelligence, Zürich", "details": "Interface-/Interaction-Design für komplexe Softwareprodukte und Finanzapplikationen (Avaloq, DAB Bank, Deutsche Bank Schweiz)" },
+    { "year": "2008", "title": "Principal Experience Designer", "company": "Namics AG (A Merkle Company), St. Gallen", "details": "Design-Beratung, Creative Lead für Pitches. Projekte: UBS e-Banking, SBB Mobile App, Mobile Banking App" },
+    { "year": "2019", "title": "Design Lead Design Systems", "company": "UBS Switzerland AG, Zürich", "details": "Design Lead für UBS Design Systems und key4 smart investing App. Aufbau des UDS in Figma. Leitung verteiltes Team (bis 6 Personen)" },
+    { "year": "2024", "title": "Design Lead Save, Protect & Growth", "company": "UBS Switzerland AG, Zürich", "details": "Design Lead my Investments. Lösungen: My Way Digital, Digital Mandate, Investor Profile, Advice Studio, key4 smart investing, key4 trading. Solution Owner Figma-Toolchain" }
+  ],
+  "works": [
+    { "id": "beyond-design", "title": "Beyond Design", "category": "Design Systems", "year": "2025", "description": "Comprehensive design system initiative for modern financial products." },
+    { "id": "design-library", "title": "Design Library Organisation", "category": "UX Strategy", "year": "2024", "description": "Strategic reorganization of design libraries for team efficiency." },
+    { "id": "bookscreening", "title": "Book Screening", "category": "Product Design", "year": "2023", "description": "Filter and screening interface for financial portfolio management." },
+    { "id": "imo", "title": "IMO — Investment Management Online", "category": "Product Design", "year": "2022", "description": "Document and offering management workflow for investment professionals." },
+    { "id": "key4-si", "title": "key4 Smart Investing", "category": "Product Design", "year": "2021", "description": "Intelligent investment advisory platform." },
+    { "id": "myway", "title": "My Way", "category": "Product Design", "year": "2020", "description": "Personalized investment journey platform, mobile-first." },
+    { "id": "uds", "title": "Universal Design System", "category": "Design Systems", "year": "2019", "description": "Enterprise design system covering components, tokens, anatomy." }
+  ],
+  "skills": [
+    { "name": "UX Research", "level": 95 },
+    { "name": "Design Systems", "level": 92 },
+    { "name": "Prototyping", "level": 90 },
+    { "name": "Visual Design", "level": 88 },
+    { "name": "Workshop Facilitation", "level": 85 },
+    { "name": "AI for Design", "level": 82 }
+  ],
+  "tools": ["Figma", "Adobe CC", "Miro", "Notion", "Git", "Framer"]
+}

@@ -1,0 +1,75 @@
+{
+  "version": "0.1.0",
+  "updatedAt": "2026-06-29T00:00:00.000Z",
+  "theme": {
+    "default": "vector-green",
+    "allowVisitorSwitch": true,
+    "available": [
+      "vector-green",
+      "crt-amber",
+      "y2k-vaporwave"
+    ],
+    "intensity": {
+      "glow": 0.6,
+      "scanlines": 0.2,
+      "noise": 0.05,
+      "crtCurve": 0.1
+    }
+  },
+  "audio": {
+    "soundDefaultOn": true,
+    "masterVolume": 0.7,
+    "tracks": {
+      "boot-glitch": 0.8,
+      "oracle-drone": 0.5,
+      "speedrun-base": 0.6,
+      "discovery-sting": 0.9,
+      "sketch-glitter": 0.7,
+      "game-bgm": 0.5,
+      "ambient-pad": 0.25,
+      "boot": {
+        "file": "/audio/boot-glitch.mp3",
+        "volume": 0.8
+      },
+      "oracleDrone": {
+        "file": "/audio/oracle-drone.mp3",
+        "volume": 0.5
+      },
+      "speedrunBase": {
+        "file": "/audio/speedrun-base.mp3",
+        "volume": 0.6
+      },
+      "discoverySting": {
+        "file": "/audio/discovery-sting.mp3",
+        "volume": 0.9
+      },
+      "sketchGlitter": {
+        "file": "/audio/sketch-glitter.mp3",
+        "volume": 0.7
+      },
+      "gameBgm": {
+        "file": "/audio/game-bgm.mp3",
+        "volume": 0.6
+      },
+      "ambientPad": {
+        "file": "/audio/ambient-pad.mp3",
+        "volume": 0.4
+      }
+    },
+    "defaultOn": false
+  },
+  "behavior": {
+    "bootMode": "first-visit",
+    "speedrunDurationSec": 60,
+    "perRunSharing": true,
+    "mobileVariant": true
+  },
+  "experience": {
+    "hybridRateLimitPerHour": 20,
+    "fullModeEnabled": true,
+    "allowedProviders": [
+      "anthropic",
+      "openai"
+    ]
+  }
+}

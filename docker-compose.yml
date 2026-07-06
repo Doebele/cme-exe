@@ -1,0 +1,33 @@
+version: "3.8"
+
+# CME.exe — AI × Design Lab
+# Host port 8093 chosen to sit directly adjacent to the Medvesek cluster:
+#   8091  ntfy
+#   8092  cme-lab  (design.medvesek.com)
+#   8093  cme-exe  (lab.medvesek.com)   <- this container
+# Port 8093 was free as of 2026-06-29 (verified against running containers).
+
+services:
+  cme-exe:
+    build: .
+    image: cme-exe:latest
+    container_name: cme-exe
+    ports:
+      - "8093:8093"
+    volumes:
+      # Persistent JSON storage (lab-facts, personas, design-quotes, settings, runs/)
+      - ./data:/data
+      # Secrets via env_file (not baked into image)
+      - ./.env:/app/.env:ro
+    environment:
+      - PORT=8093
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      # SESSION_SECRET, ANTHROPIC_API_KEY, ADMIN_PASSWORD_HASH come from .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8093/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

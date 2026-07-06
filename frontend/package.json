@@ -1,0 +1,36 @@
+{
+  "name": "cme-exe-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "@xterm/xterm": "^5.5.0",
+    "gsap": "^3.15.0",
+    "iconoir-react": "^7.11.1",
+    "p5": "^1.11.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.0",
+    "three": "^0.185.0",
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/p5": "^1.7.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "oxlint": "^1.69.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "~5.9.2",
+    "vite": "^8.1.0"
+  }
+}

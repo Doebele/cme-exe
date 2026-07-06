@@ -1,0 +1,15 @@
+{
+  "name": "cme-exe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CME.exe — AI × Design Lab. Experimental site for Claus Medvesek.",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "lint:frontend": "cd frontend && npm run lint",
+    "docker:up": "docker-compose up --build -d",
+    "docker:down": "docker-compose down"
+  },
+  "license": "UNLICENSED"
+}

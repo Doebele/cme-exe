@@ -1,0 +1,2337 @@
+@import "tailwindcss";
+
+/*
+ * CME.exe token system.
+ * Themes swap via [data-theme] on <html>. Tailwind utilities consume the
+ * mapped --color-* tokens through @theme below.
+ */
+
+:root,
+[data-theme="vector-green"] {
+  --color-bg: #0a0e0a;
+  --color-text-primary: #39ff14;
+  --color-text-secondary: #4ecdc4;
+  --color-accent: #4ecdc4;
+  --color-accent-secondary: #ffb000;
+
+  --font-display: "Fira Mono", monospace;
+  --font-body: "Fira Sans", sans-serif;
+
+  --glow-strength: 0.6;
+  --scanline-opacity: 0.2;
+  --crt-curve: 0.1;
+}
+
+[data-theme="crt-amber"] {
+  --color-bg: #0a0a0a;
+  --color-text-primary: #ffb000;
+  --color-text-secondary: #ff6b35;
+  --color-accent: #ff6b35;
+  --color-accent-secondary: #ffb000;
+
+  --glow-strength: 0.8;
+  --scanline-opacity: 0.4;
+  --crt-curve: 0.1;
+}
+
+[data-theme="y2k-vaporwave"] {
+  --color-bg: #1a0a2e;
+  --color-text-primary: #ff71ce;
+  --color-text-secondary: #01cdfe;
+  --color-accent: #01cdfe;
+  --color-accent-secondary: #b967ff;
+
+  --glow-strength: 0.7;
+  --scanline-opacity: 0.1;
+  --crt-curve: 0.1;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-accent: var(--color-accent);
+  --color-accent-secondary: var(--color-accent-secondary);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* CRT glow on primary text. */
+  body,
+  .crt-glow {
+    text-shadow: 0 0 calc(10px * var(--glow-strength))
+      var(--color-text-primary);
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+    color: var(--color-text-primary);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+}
+
+/*
+ * Fixed scanline overlay. Sits above content but ignores pointer events.
+ * Opacity is driven by --scanline-opacity per theme.
+ */
+.scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 3px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+.vignette::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+
+/*
+ * Speedrun-Agent animations. All gated behind prefers-reduced-motion at the
+ * end of this block. Colors inherit from theme variables.
+ */
+
+@keyframes speedrun-cursor-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.speedrun-cursor-idle {
+  animation: speedrun-cursor-float 2.6s ease-in-out infinite;
+}
+
+@keyframes speedrun-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.speedrun-pulse-dot {
+  animation: speedrun-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes speedrun-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.speedrun-caret-blink {
+  animation: speedrun-caret 1s step-end infinite;
+}
+
+@keyframes speedrun-spin {
+  to { transform: rotate(360deg); }
+}
+
+.speedrun-spinner {
+  animation: speedrun-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speedrun-cursor-idle,
+  .speedrun-pulse-dot,
+  .speedrun-caret-blink,
+  .speedrun-spinner {
+    animation: none;
+  }
+}
+
+/*
+ * Speedrun station transitions. Drives the progressive-reveal + active/visited
+ * state changes. Hidden stations animate opacity + transform (scale 0.85 -> 1)
+ * over 400ms; under prefers-reduced-motion the transform is dropped and only
+ * opacity transitions, so stations appear without motion. Border/box-shadow
+ * transitions stay short so the active glow snaps in.
+ */
+.speedrun-station {
+  transition:
+    opacity 400ms ease-out,
+    transform 400ms ease-out,
+    border-color 300ms ease-out,
+    box-shadow 300ms ease-out,
+    color 300ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speedrun-station {
+    transition:
+      opacity 200ms ease-out,
+      border-color 150ms ease-out,
+      box-shadow 150ms ease-out,
+      color 150ms ease-out;
+  }
+}
+
+/*
+ * Stage ASCII art — rendered inside <pre> for profile/hero images.
+ * Uses the theme display font (Fira Mono) at small size with accent glow.
+ */
+.stage-ascii {
+  font-family: var(--font-display);
+  font-size: 0.45rem;
+  line-height: 0.5rem;
+  letter-spacing: 0.02em;
+  white-space: pre;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  text-shadow: 0 0 calc(4px * var(--glow-strength)) color-mix(in srgb, var(--color-accent) 40%, transparent);
+  margin: 0;
+  max-height: 16rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-ascii { text-shadow: none; }
+}
+
+@media (max-width: 768px) {
+  .stage-ascii {
+    font-size: 0.35rem;
+    line-height: 0.4rem;
+    max-height: 10rem;
+  }
+}
+
+
+/*
+ * Oracle + Sketch (Phase 1b) styles. All colors derive from theme variables so
+ * the three themes (vector-green, crt-amber, y2k-vaporwave) stay consistent.
+ * Animations are gated behind prefers-reduced-motion at the end of the block.
+ */
+
+@keyframes oracle-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes oracle-thinking {
+  0% { opacity: 0.35; }
+  50% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+
+@keyframes oracle-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* ---- Terminal window (Oracle) ---- */
+
+.oracle-terminal {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg) 85%, #000 15%);
+  box-shadow:
+    0 0 calc(28px * var(--glow-strength))
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+    inset 0 0 calc(40px * var(--glow-strength))
+      color-mix(in srgb, var(--color-bg) 60%, transparent);
+  overflow: hidden;
+}
+
+.oracle-terminal::before {
+  /* Local CRT scanlines, confined to the terminal. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    color-mix(in srgb, #000 35%, transparent) 3px,
+    color-mix(in srgb, #000 35%, transparent) 4px
+  );
+  opacity: calc(0.6 * var(--scanline-opacity) + 0.15);
+  mix-blend-mode: multiply;
+}
+
+.oracle-terminal__bar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 70%, #000 30%);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.oracle-terminal__dots {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.oracle-terminal__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-text-secondary) 50%, transparent);
+}
+
+.oracle-terminal__title {
+  flex: 1;
+  text-align: center;
+  color: var(--color-text-primary);
+}
+
+.oracle-terminal__status {
+  color: var(--color-text-secondary);
+  font-size: 0.6rem;
+}
+
+.oracle-terminal__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-accent);
+}
+
+.oracle-terminal__idle {
+  opacity: 0.6;
+}
+
+.oracle-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 calc(6px * var(--glow-strength)) var(--color-accent);
+}
+
+.oracle-dot--pulse {
+  animation: oracle-dot-pulse 1.4s ease-in-out infinite;
+}
+
+.oracle-terminal__body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 240px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 1rem 1.1rem;
+}
+
+.oracle-terminal__footer {
+  position: relative;
+  z-index: 3;
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 75%, #000 25%);
+}
+
+.oracle-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.oracle-welcome {
+  color: var(--color-text-secondary);
+}
+
+.oracle-welcome__line {
+  margin-bottom: 1rem;
+}
+
+.oracle-qa {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.oracle-question {
+  display: flex;
+  gap: 0.5rem;
+  color: var(--color-text-secondary);
+}
+
+.oracle-answer {
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.oracle-prompt {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.oracle-caret {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--color-accent);
+  animation: oracle-caret 1s step-end infinite;
+}
+
+.oracle-thinking {
+  display: inline-block;
+  letter-spacing: 0.15em;
+  color: var(--color-accent);
+  animation: oracle-thinking 1.1s ease-in-out infinite;
+}
+
+.oracle-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 45%, transparent);
+  background: color-mix(in srgb, var(--color-accent-secondary) 8%, transparent);
+  color: var(--color-accent-secondary);
+  font-size: 0.82rem;
+}
+
+.oracle-error__retry {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 50%, transparent);
+  color: var(--color-accent-secondary);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.oracle-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.oracle-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  caret-color: var(--color-accent);
+}
+
+.oracle-input::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 55%, transparent);
+}
+
+.oracle-input:disabled {
+  opacity: 0.6;
+}
+
+.oracle-send {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.oracle-send:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.oracle-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.oracle-disclaimer {
+  margin-top: 1rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
+}
+
+/* Shared example-prompt chip styling, reused by Sketch. */
+.oracle-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.oracle-chip {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.oracle-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  color: var(--color-accent);
+}
+
+.oracle-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.oracle-chip.is-active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ---- Sketch section ---- */
+
+.sketch-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 900px) {
+  .sketch-layout {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+
+.sketch-input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .sketch-input-panel {
+    flex: 0 0 40%;
+  }
+}
+
+.sketch-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .sketch-preview-panel {
+    flex: 1 1 60%;
+    min-width: 0;
+  }
+}
+
+.sketch-welcome {
+  color: var(--color-text-secondary);
+}
+
+.sketch-welcome__line {
+  margin-bottom: 0.85rem;
+  font-family: var(--font-display);
+}
+
+.sketch-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sketch-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  background: color-mix(in srgb, var(--color-bg) 60%, #000 20%);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.75rem;
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
+.sketch-textarea:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+.sketch-textarea::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 50%, transparent);
+}
+
+.sketch-textarea:disabled {
+  opacity: 0.55;
+}
+
+.sketch-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.sketch-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sketch-generate {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sketch-generate:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.sketch-generate:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sketch-reset {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+
+.sketch-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sketch-gallery-wrap {
+  border-top: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  padding-top: 0.85rem;
+}
+
+.sketch-gallery__heading {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+  margin-bottom: 0.6rem;
+}
+
+.sketch-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.sketch-gallery__empty {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+
+.sketch-gallery__item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+}
+
+.sketch-gallery__item.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  box-shadow: 0 0 calc(8px * var(--glow-strength))
+    color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.sketch-gallery__select {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.sketch-gallery__select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sketch-gallery__prompt {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sketch-gallery__meta {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: color-mix(in srgb, var(--color-text-secondary) 65%, transparent);
+}
+
+.sketch-gallery__trash {
+  background: transparent;
+  border: none;
+  border-left: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+  padding: 0 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.sketch-gallery__trash:hover:not(:disabled) {
+  color: var(--color-accent-secondary);
+}
+
+.sketch-gallery__trash:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sketch-preview {
+  width: 100%;
+}
+
+.sketch-preview__frame {
+  position: relative;
+  width: 100%;
+  /* 600x400 → 3:2. Constrained to the sketch's native aspect. */
+  aspect-ratio: 3 / 2;
+  max-width: 600px;
+  margin: 0 auto;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, #000 20%);
+  overflow: hidden;
+}
+
+.sketch-preview__iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.sketch-preview--error,
+.sketch-placeholder {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, #000 20%);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+}
+
+.sketch-preview--error {
+  border-color: color-mix(in srgb, var(--color-accent-secondary) 50%, transparent);
+}
+
+.sketch-preview__error-title {
+  color: var(--color-accent-secondary);
+  font-size: 0.9rem;
+}
+
+.sketch-preview__error-msg {
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+.sketch-preview__error-hint {
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+  font-size: 0.7rem;
+}
+
+.sketch-error {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 50%, transparent);
+  background: color-mix(in srgb, var(--color-accent-secondary) 8%, transparent);
+  color: var(--color-accent-secondary);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+}
+
+.sketch-code {
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 60%, #000 25%);
+}
+
+.sketch-code__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+}
+
+.sketch-code__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+}
+
+.sketch-code__toggle:hover {
+  color: var(--color-accent);
+}
+
+.sketch-code__brackets {
+  letter-spacing: 0;
+}
+
+.sketch-code__copy {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+}
+
+.sketch-code__copy:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+.sketch-code__pre {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--font-display);
+  font-size: 0.78em;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sketch-disclaimer {
+  margin-top: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oracle-caret,
+  .oracle-thinking,
+  .oracle-dot--pulse {
+    animation: none;
+  }
+}
+
+/* Mobile: make the Oracle terminal fill available vertical space. */
+@media (max-width: 767px) {
+  .oracle-terminal {
+    border-radius: 6px;
+  }
+  .oracle-terminal__body {
+    min-height: 40vh;
+    max-height: 52vh;
+  }
+}
+
+/*
+ * Phase 1c — Boot sequence + Designer's Quest.
+ * All colors derive from theme variables. Animations honor
+ * prefers-reduced-motion (see the gated block at the end).
+ */
+
+/* ---- Boot overlay --------------------------------------------------------- */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boot-overlay--fadeout {
+  animation: boot-fade-out 200ms ease forwards;
+  pointer-events: none;
+}
+
+@keyframes boot-fade-out {
+  to { opacity: 0; }
+}
+
+.boot-overlay--flash {
+  animation: boot-flash 600ms ease;
+}
+
+@keyframes boot-flash {
+  0% { background: #000; }
+  3% { background: #ffffff; }
+  8% { background: #000; }
+  100% { background: #000; }
+}
+
+.boot-crt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boot-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  animation: boot-white-flash 220ms ease-out;
+}
+
+@keyframes boot-white-flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+.boot-crt__scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    color-mix(in srgb, #000 55%, transparent) 3px,
+    color-mix(in srgb, #000 55%, transparent) 4px
+  );
+  opacity: 0;
+  animation: boot-scanlines-in 600ms ease forwards;
+  mix-blend-mode: multiply;
+}
+
+@keyframes boot-scanlines-in {
+  0% { opacity: 0; transform: translateY(-30%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.boot-crt__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 45%,
+    rgba(0, 0, 0, 0.65) 100%
+  );
+}
+
+.boot-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 720px;
+  padding: 0 1.25rem;
+  text-align: left;
+}
+
+.boot-bios {
+  margin: 0;
+  font-size: clamp(0.55rem, 1.6vw, 0.85rem);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-shadow:
+    0 0 calc(6px * var(--glow-strength)) var(--color-text-primary),
+    0 0 calc(14px * var(--glow-strength)) var(--color-text-primary);
+}
+
+.boot-bios__caret {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--color-accent);
+  animation: boot-caret 0.9s step-end infinite;
+}
+
+@keyframes boot-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.boot-logo {
+  margin: 0.75rem 0 0;
+  font-size: clamp(0.4rem, 1.2vw, 0.7rem);
+  line-height: 1.1;
+  white-space: pre;
+  overflow: hidden;
+  text-shadow:
+    0 0 calc(6px * var(--glow-strength)) var(--color-text-primary);
+}
+
+.boot-logo__char--final {
+  color: var(--color-text-primary);
+}
+
+.boot-logo__char--rand {
+  color: #ffffff;
+  opacity: 0.75;
+}
+
+.boot-skip {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 3;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 45%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.boot-skip:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-overlay--flash { animation: none; }
+  .boot-flash { display: none; }
+  .boot-crt__scanlines { opacity: 1; transform: none; animation: none; }
+  .boot-overlay--fadeout { animation: none; opacity: 0; }
+  .boot-bios__caret { animation: none; }
+}
+
+/* ---- Designer's Quest ----------------------------------------------------- */
+
+.quest-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quest-canvas-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  max-height: 65vh;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, #000 20%);
+  overflow: hidden;
+  box-shadow:
+    0 0 calc(20px * var(--glow-strength))
+      color-mix(in srgb, var(--color-accent) 18%, transparent),
+    inset 0 0 calc(40px * var(--glow-strength))
+      color-mix(in srgb, var(--color-bg) 60%, transparent);
+}
+
+.quest-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.quest-quote-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 70%;
+  padding: 0.6rem 0.85rem 0.45rem;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  font-family: var(--font-display);
+  text-align: center;
+  pointer-events: none;
+  z-index: 6;
+  animation: quest-quote-pop-in 220ms ease-out;
+}
+
+.quest-quote-pop--paused::before {
+  /* Subtle full-frame dim while the world is paused for the quote. */
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-bg) 35%, transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.quest-quote-pop__progress {
+  margin: 0.5rem auto 0.25rem;
+  width: 80%;
+  height: 2px;
+  background: color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  overflow: hidden;
+}
+
+.quest-quote-pop__progress-bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--color-accent);
+  transform-origin: left center;
+  animation: quest-quote-progress var(--quote-duration, 6s) linear forwards;
+}
+
+/* Reduced motion: keep the progress indicator (it conveys remaining time, not
+   decorative motion) but disable the entrance animation. */
+@media (prefers-reduced-motion: reduce) {
+  .quest-quote-pop { animation: none; }
+}
+
+.quest-quote-pop__skip {
+  margin: 0.25rem 0 0;
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  opacity: 0.65;
+}
+
+.quest-quote-pop__skip kbd {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  padding: 0 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+  border-radius: 2px;
+  margin: 0 0.1rem;
+}
+
+@keyframes quest-quote-pop-in {
+  from { opacity: 0; transform: translate(-50%, -45%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes quest-quote-progress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+.quest-quote-pop__text {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-accent);
+  text-shadow: 0 0 calc(6px * var(--glow-strength)) var(--color-accent);
+}
+
+.quest-quote-pop__src {
+  margin: 0.25rem 0 0;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+
+.quest-touch-pad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 15vh;
+}
+
+.quest-touch-btn {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-bg) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  user-select: none;
+  touch-action: none;
+  cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease;
+}
+
+.quest-touch-btn:active {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+.quest-start {
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  max-height: 65vh;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, #000 20%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.quest-start__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+}
+
+.quest-start__ascii {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+  text-shadow: 0 0 calc(8px * var(--glow-strength)) var(--color-text-secondary);
+}
+
+.quest-start kbd,
+.quest-overlay kbd,
+section#quest kbd {
+  font-family: var(--font-display);
+  font-size: 0.7em;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 60%, transparent);
+  border-radius: 3px;
+  color: var(--color-text-primary);
+}
+
+.quest-btn {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.quest-btn--primary {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+
+.quest-btn--primary:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.quest-btn--ghost {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+  color: var(--color-text-secondary);
+}
+
+.quest-btn--ghost:hover {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
+}
+
+.quest-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  backdrop-filter: blur(2px);
+  z-index: 6;
+  text-align: center;
+}
+
+.quest-pause {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 6;
+  background: color-mix(in srgb, var(--color-bg) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+}
+
+.quest-pause:hover {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+.quest-controls {
+  position: absolute;
+  left: 0.55rem;
+  bottom: 0.5rem;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.15rem 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.4;
+  pointer-events: none;
+  color: var(--color-text-secondary);
+}
+
+.quest-controls__key {
+  color: color-mix(in srgb, var(--color-text-secondary) 65%, transparent);
+}
+
+.quest-controls__act {
+  color: var(--color-text-primary);
+}
+
+.quest-level-announce {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  pointer-events: none;
+  z-index: 5;
+  font-family: var(--font-display);
+  text-align: center;
+  animation: quest-level-announce 1.5s ease forwards;
+}
+
+.quest-level-announce__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.quest-level-announce__num {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  line-height: 1;
+  color: var(--color-text-primary);
+  text-shadow: 0 0 calc(16px * var(--glow-strength)) var(--color-text-primary);
+}
+
+@keyframes quest-level-announce {
+  0% { opacity: 0; transform: scale(0.85); }
+  15% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-quote-pop { animation: none; opacity: 1; }
+  .quest-level-announce { animation: none; }
+}
+
+
+.oracle-empty {
+  color: var(--color-text-muted, var(--color-text-secondary));
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.sketch-gallery__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.sketch-gallery__count { opacity: 0.7; }
+
+.sketch-gallery__clear {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.sketch-gallery__clear:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.sketch-gallery__clear:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sketch-gallery__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.sketch-gallery__action {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.sketch-gallery__action:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.sketch-gallery__action--danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #ff5555 60%, var(--color-accent) 40%);
+  color: color-mix(in srgb, #ff5555 60%, var(--color-accent) 40%);
+}
+
+.sketch-gallery__action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Full-width previous-sketches row below the prompt/code + preview split. */
+.sketch-gallery-outer {
+  width: 100%;
+  max-width: 1100px;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+}
+
+@media (max-width: 899px) {
+  .sketch-gallery-outer { margin-top: 1rem; }
+}
+
+/* The old inline .sketch-gallery-wrap inside the input panel is no longer
+   rendered, but the rule is retained so any stale references don't break. */
+.sketch-gallery-wrap {
+  border-top: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  padding-top: 0.85rem;
+}
+
+/* Past Q&A pairs are de-emphasized so the latest one stays in focus.
+   Older entries shrink slightly, fade, and lose their separator. */
+.oracle-qa--past {
+  opacity: 0.5;
+  font-size: 0.85em;
+  filter: saturate(0.7);
+  /* Soft separator above each past entry; the most-recent pair has none. */
+  padding-top: 0.75rem;
+  border-top: 1px dashed color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+}
+
+.oracle-qa--past .oracle-question {
+  color: color-mix(in srgb, var(--color-text-secondary) 75%, transparent);
+}
+
+.oracle-qa--past .oracle-answer {
+  color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
+}
+
+/* The most recent Q&A pair stays full-strength. */
+.oracle-qa--last {
+  opacity: 1;
+  filter: none;
+}
+
+.oracle-qa--last .oracle-answer {
+  color: var(--color-text-primary);
+  text-shadow: 0 0 calc(4px * var(--glow-strength)) color-mix(in srgb, var(--color-text-primary) 30%, transparent);
+}
+
+.oracle-qa--last .oracle-question {
+  color: var(--color-accent);
+}
+
+.oracle-qa--last + .oracle-qa--past,
+.oracle-qa--past + .oracle-qa--last {
+  border-top: none;
+  padding-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No animations to gate here, but keep transitions off for consistency. */
+  .oracle-qa { transition: none; }
+}
+
+/*
+ * Admin area styles. Reuses theme variables; visual language matches
+ * ApiKeyWidget / Navigation (Fira Mono, bordered inputs, accent buttons).
+ */
+
+.admin-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.admin-loading {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 2rem 0;
+}
+
+/* ---- Login ----------------------------------------------------------- */
+
+.admin-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--color-bg);
+}
+
+.admin-login__card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 2rem 1.75rem 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 85%, #000 15%);
+  box-shadow: 0 0 calc(24px * var(--glow-strength))
+    color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.admin-login__kicker {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--color-text-secondary);
+}
+
+.admin-login__title {
+  font-size: 1.4rem;
+  letter-spacing: 0.12em;
+  margin: 0.25rem 0 1rem;
+}
+
+.admin-login__label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--color-text-secondary);
+}
+
+.admin-login__input {
+  margin-bottom: 0.4rem;
+}
+
+.admin-login__back {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.admin-login__back:hover {
+  color: var(--color-text-primary);
+}
+
+/* ---- Dashboard shell ------------------------------------------------- */
+
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.admin-topbar__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.9rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-topbar__brand {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+}
+
+/* ---- Tabs ------------------------------------------------------------ */
+
+.admin-tabs {
+  position: sticky;
+  top: 49px;
+  z-index: 15;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  backdrop-filter: blur(8px);
+  overflow-x: auto;
+}
+
+.admin-tabs__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.admin-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.75rem 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.admin-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.admin-tab.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+/* ---- Main + footer --------------------------------------------------- */
+
+.admin-main {
+  flex: 1;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.admin-main__inner {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-footer {
+  border-top: 1px solid color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.admin-footer__link {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.admin-footer__link:hover {
+  color: var(--color-text-primary);
+}
+
+/* ---- Tab panel ------------------------------------------------------- */
+
+.admin-tab__header {
+  margin-bottom: 0.25rem;
+}
+
+.admin-tab__heading {
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.5rem;
+}
+
+.admin-tab__lede {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  max-width: 60ch;
+}
+
+/* ---- Card ------------------------------------------------------------ */
+
+.admin-card {
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 22%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 80%, #000 12%);
+}
+
+.admin-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+}
+
+.admin-card__title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin: 0;
+}
+
+.admin-card__sub {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-secondary);
+}
+
+.admin-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-card__body {
+  padding: 1rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* ---- Inputs / buttons (shared with ApiKeyWidget style) --------------- */
+
+.admin-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  padding: 0.45rem 0.6rem;
+  outline: none;
+  caret-color: var(--color-accent);
+}
+.admin-input:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 65%, transparent);
+}
+.admin-input::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 50%, transparent);
+}
+.admin-input:disabled {
+  opacity: 0.5;
+}
+
+.admin-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 160px;
+  background: color-mix(in srgb, var(--color-bg) 60%, #000 20%);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.75rem;
+  outline: none;
+  caret-color: var(--color-accent);
+}
+.admin-textarea:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+.admin-textarea:disabled {
+  opacity: 0.5;
+}
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
+}
+.admin-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-btn--accent {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+.admin-btn--accent:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.admin-btn--ghost {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+  color: var(--color-text-secondary);
+}
+.admin-btn--ghost:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  color: var(--color-accent);
+}
+
+.admin-btn--danger {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 60%, transparent);
+  color: var(--color-accent-secondary);
+}
+
+.admin-btn--block {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* ---- Save row + status + hint --------------------------------------- */
+
+.admin-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.admin-hint {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+
+.admin-meta {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+
+.admin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
+}
+.admin-status__mark {
+  font-weight: bold;
+}
+.admin-status.is-ok { color: var(--color-accent); }
+.admin-status.is-no { color: var(--color-accent-secondary); }
+
+.admin-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-text-secondary);
+}
+
+/* ---- Provider block -------------------------------------------------- */
+
+.admin-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ---- Error banner ---------------------------------------------------- */
+
+.admin-error {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 50%, transparent);
+  background: color-mix(in srgb, var(--color-accent-secondary) 8%, transparent);
+  color: var(--color-accent-secondary);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+}
+
+/* ---- Navigation reorder list ---------------------------------------- */
+
+.admin-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+}
+
+.admin-nav-item__grip {
+  color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
+  font-size: 0.9rem;
+}
+
+.admin-nav-item__check {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.admin-nav-item__check input {
+  accent-color: var(--color-accent);
+  width: 16px;
+  height: 16px;
+}
+
+.admin-nav-item__title {
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+
+.admin-nav-item__id {
+  font-size: 0.6rem;
+  text-transform: lowercase;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+
+.admin-nav-item__arrows {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.admin-arrow {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.admin-arrow:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.admin-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ---- Range sliders --------------------------------------------------- */
+
+.admin-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label value"
+    "input input";
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.admin-range__label {
+  grid-area: label;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-secondary);
+}
+
+.admin-range__value {
+  grid-area: value;
+  font-size: 0.7rem;
+  color: var(--color-accent);
+  text-align: right;
+}
+
+.admin-range__input {
+  grid-area: input;
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  outline: none;
+  cursor: pointer;
+}
+.admin-range__input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-range__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: none;
+  box-shadow: 0 0 calc(6px * var(--glow-strength)) var(--color-accent);
+  cursor: pointer;
+}
+.admin-range__input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: none;
+  box-shadow: 0 0 calc(6px * var(--glow-strength)) var(--color-accent);
+  cursor: pointer;
+}
+
+/* ---- Radio group + checkboxes --------------------------------------- */
+
+.admin-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-radio-group__label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-text-secondary);
+}
+
+.admin-radio-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.admin-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.admin-radio input {
+  accent-color: var(--color-accent);
+}
+.admin-radio.is-active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.admin-check input {
+  accent-color: var(--color-accent);
+  width: 16px;
+  height: 16px;
+}
+.admin-check.is-active {
+  color: var(--color-text-primary);
+}
+
+.admin-check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.admin-check-row--multi {
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ---- Field rows ------------------------------------------------------ */
+
+.admin-field-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.3rem;
+}
+
+@media (min-width: 560px) {
+  .admin-field-row {
+    grid-template-columns: 220px 1fr;
+    align-items: center;
+  }
+}
+
+.admin-field-row--top {
+  align-items: start;
+}
+
+.admin-field-row__label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-secondary);
+}
+
+.admin-field-row__control {
+  min-width: 0;
+}
+
+.admin-field-row__hint {
+  grid-column: 1 / -1;
+  font-size: 0.6rem;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+/* ---- Recordings tab ------------------------------------------------- */
+
+.admin-recording-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-recording {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 60%, #000 15%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-recording__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-recording__star {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  width: 1ch;
+}
+
+.admin-recording__title {
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.admin-recording__badge {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.admin-recording__badge.is-featured {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  color: var(--color-accent);
+}
+
+.admin-recording__edit {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.admin-recording__edit .admin-input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.admin-recording__meta {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--color-text-secondary) 75%, transparent);
+  word-break: break-all;
+}
+
+.admin-recording__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-radio.is-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.admin-radio.is-disabled input {
+  cursor: not-allowed;
+}

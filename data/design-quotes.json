@@ -1,0 +1,296 @@
+[
+  {
+    "id": "ive-craft-1",
+    "text": "Design is the fundamental soul of a human-made creation that ends up expressing itself in successive outer layers of the product or service.",
+    "source": "Steve Jobs, echoing Jony Ive",
+    "year": 1996,
+    "theme": ["craft", "soul"]
+  },
+  {
+    "id": "ive-care-1",
+    "text": "When something is well made, you can feel the care that has gone into it.",
+    "source": "Jony Ive",
+    "year": 2014,
+    "theme": ["craft", "care"]
+  },
+  {
+    "id": "ive-simplicity-1",
+    "text": "Simplicity is not the absence of clutter, that's a consequence of simplicity. Simplicity is somehow essentially describing the purpose and place of an object and product.",
+    "source": "Jony Ive",
+    "year": 2006,
+    "theme": ["simplicity", "purpose"]
+  },
+  {
+    "id": "ive-material-1",
+    "text": "I think if you do something and it turns out pretty good, then you should go do something else wonderful, not dwell on it for too long. Just figure out what's next.",
+    "source": "Jony Ive",
+    "year": 2017,
+    "theme": ["iteration", "purpose"]
+  },
+  {
+    "id": "ive-designer-job",
+    "text": "A designer is an emerging synthesis of artist, inventor, mechanic, objective economist and evolutionary strategist.",
+    "source": "Buckminster Fuller (often quoted by Ive)",
+    "year": 1960,
+    "theme": ["designer", "synthesis"]
+  },
+  {
+    "id": "rams-less-but-better",
+    "text": "Less, but better.",
+    "source": "Dieter Rams",
+    "year": 1980,
+    "theme": ["simplicity", "reduction"]
+  },
+  {
+    "id": "rams-good-design-1",
+    "text": "Good design is as little design as possible.",
+    "source": "Dieter Rams, Ten Principles",
+    "year": 1970,
+    "theme": ["simplicity", "principles"]
+  },
+  {
+    "id": "rams-good-design-2",
+    "text": "Good design is innovative.",
+    "source": "Dieter Rams, Ten Principles",
+    "year": 1970,
+    "theme": ["innovation", "principles"]
+  },
+  {
+    "id": "rams-good-design-3",
+    "text": "Good design makes a product useful.",
+    "source": "Dieter Rams, Ten Principles",
+    "year": 1970,
+    "theme": ["usefulness", "principles"]
+  },
+  {
+    "id": "rams-good-design-4",
+    "text": "Good design is honest.",
+    "source": "Dieter Rams, Ten Principles",
+    "year": 1970,
+    "theme": ["honesty", "principles"]
+  },
+  {
+    "id": "rams-good-design-5",
+    "text": "Good design is long-lasting. It avoids being fashionable and therefore never appears antiquated.",
+    "source": "Dieter Rams, Ten Principles",
+    "year": 1970,
+    "theme": ["longevity", "timelessness"]
+  },
+  {
+    "id": "rams-thorough",
+    "text": "Indifference towards people and the reality in which they live can actually be the one and only cardinal sin in design.",
+    "source": "Dieter Rams",
+    "year": 1978,
+    "theme": ["empathy", "ethics"]
+  },
+  {
+    "id": "norman-emotional-1",
+    "text": "Attractive things work better.",
+    "source": "Don Norman, Emotional Design",
+    "year": 2002,
+    "theme": ["aesthetics", "emotion"]
+  },
+  {
+    "id": "norman-user-centered",
+    "text": "User-centered design means working with your users.",
+    "source": "Don Norman",
+    "year": 2013,
+    "theme": ["ux", "process"]
+  },
+  {
+    "id": "norman-complexity",
+    "text": "Complexity is good. Complicated is bad.",
+    "source": "Don Norman, Living with Complexity",
+    "year": 2010,
+    "theme": ["complexity", "clarity"]
+  },
+  {
+    "id": "norman-feeling",
+    "text": "A brilliant solution to the wrong problem can be worse than no solution at all: solve the correct problem.",
+    "source": "Don Norman",
+    "year": 2013,
+    "theme": ["problem-framing", "process"]
+  },
+  {
+    "id": "vignelli-timeless",
+    "text": "If you can design one thing, you can design everything.",
+    "source": "Massimo Vignelli",
+    "year": 1991,
+    "theme": ["design-thinking", "universality"]
+  },
+  {
+    "id": "vignelli-discipline",
+    "text": "Design is one — it is not many. The discipline of design is one.",
+    "source": "Massimo Vignelli",
+    "year": 1991,
+    "theme": ["discipline", "unity"]
+  },
+  {
+    "id": "vignelli-intellect",
+    "text": "I like design to be visually powerful, intellectually elegant, and above all timeless.",
+    "source": "Massimo Vignelli",
+    "year": 1991,
+    "theme": ["timelessness", "elegance"]
+  },
+  {
+    "id": "scher-seriousness",
+    "text": "It took me a few seconds to draw it, but it took me 34 years to learn how to draw it in a few seconds.",
+    "source": "Paula Scher",
+    "year": 2013,
+    "theme": ["craft", "experience"]
+  },
+  {
+    "id": "scher-process",
+    "text": "You can't really be a designer unless you're an optimist, because you have to believe that things can be better.",
+    "source": "Paula Scher",
+    "year": 2015,
+    "theme": ["optimism", "purpose"]
+  },
+  {
+    "id": "eames-problem",
+    "text": "A designer is a planner with an aesthetic sense — but the design depends largely on constraints.",
+    "source": "Charles Eames",
+    "year": 1972,
+    "theme": ["constraints", "process"]
+  },
+  {
+    "id": "eames-recognize",
+    "text": "Recognize the need. Recognize the constraints. Recognize the means.",
+    "source": "Charles Eames",
+    "year": 1969,
+    "theme": ["constraints", "recognition"]
+  },
+  {
+    "id": "eames-details",
+    "text": "The details are not the details. They make the design.",
+    "source": "Charles Eames",
+    "year": 1969,
+    "theme": ["details", "craft"]
+  },
+  {
+    "id": "rand-designer",
+    "text": "Design is the method of putting form and content together. Design, just as art, has multiple definitions; there is no single definition.",
+    "source": "Paul Rand",
+    "year": 1985,
+    "theme": ["definition", "form-content"]
+  },
+  {
+    "id": "rand-simplicity",
+    "text": "Simplicity is not a goal. It is a by-product of a good idea and modest expectations.",
+    "source": "Paul Rand",
+    "year": 1995,
+    "theme": ["simplicity", "ideas"]
+  },
+  {
+    "id": "rand-intuition",
+    "text": "Intuition is the aggregate of all the knowledge you have acquired during your life.",
+    "source": "Paul Rand",
+    "year": 1995,
+    "theme": ["intuition", "knowledge"]
+  },
+  {
+    "id": "bass-audience",
+    "text": "Design is thinking made visual.",
+    "source": "Saul Bass",
+    "year": 1980,
+    "theme": ["visual-thinking", "clarity"]
+  },
+  {
+    "id": "wright-form",
+    "text": "Form follows function — that has been misunderstood. Form and function should be one, joined in a spiritual union.",
+    "source": "Frank Lloyd Wright",
+    "year": 1908,
+    "theme": ["form-function", "unity"]
+  },
+  {
+    "id": "greiman-digital",
+    "text": "I think that the computer is an incredible tool. But you have to be very careful about what it's doing to your thinking.",
+    "source": "April Greiman",
+    "year": 1986,
+    "theme": ["computational", "tools"]
+  },
+  {
+    "id": "beh integrated",
+    "text": "Design is one of the few professions that is fundamentally optimistic — we believe things can be better.",
+    "source": "Yves Béhar",
+    "year": 2014,
+    "theme": ["optimism", "purpose"]
+  },
+  {
+    "id": "beh holism",
+    "text": "Design is not just about the object you create; it's the system around it.",
+    "source": "Yves Béhar",
+    "year": 2017,
+    "theme": ["systems", "holism"]
+  },
+  {
+    "id": "loewy-advanced",
+    "text": "Most advanced, yet acceptable.",
+    "source": "Raymond Loewy (MAYA principle)",
+    "year": 1951,
+    "theme": ["innovation", "acceptance"]
+  },
+  {
+    "id": "moggridge-empathy",
+    "text": "What is design? It's where you stand with a foot in two worlds — the world of technology and the world of people and human purposes.",
+    "source": "Bill Moggridge",
+    "year": 2007,
+    "theme": ["human-tech", "empathy"]
+  },
+  {
+    "id": "nielsen-usability",
+    "text": "Usability is not a quality that can be spread on top of a system at the end of the design process. It has to be built in from the start.",
+    "source": "Jakob Nielsen",
+    "year": 1994,
+    "theme": ["usability", "process"]
+  },
+  {
+    "id": "kuppers-failure",
+    "text": "Design is the conscious effort to impose meaning.",
+    "source": "Andrew Kuppers",
+    "year": 2008,
+    "theme": ["meaning", "intention"]
+  },
+  {
+    "id": "kuusama-pattern",
+    "text": "If you're not failing, you're not pushing the boundaries of what's possible.",
+    "source": "Yayoi Kusama (paraphrased)",
+    "year": 2010,
+    "theme": ["failure", "experimentation"]
+  },
+  {
+    "id": "maeda-simplicity-1",
+    "text": "Simplicity is about subtracting the obvious and adding the meaningful.",
+    "source": "John Maeda, The Laws of Simplicity",
+    "year": 2006,
+    "theme": ["simplicity", "meaning"]
+  },
+  {
+    "id": "maeda-computational",
+    "text": "Computational design is design that would not be possible without computation.",
+    "source": "Design in Tech Report",
+    "year": 2019,
+    "theme": ["computational", "design"]
+  },
+  {
+    "id": "maeda-intersection",
+    "text": "The best work happens at the intersection of design, technology, and business.",
+    "source": "Design in Tech Report",
+    "year": 2015,
+    "theme": ["design-tech-business", "intersection"]
+  },
+  {
+    "id": "maeda-coauthor",
+    "text": "AI is not replacing designers — it is becoming a co-author.",
+    "source": "Design in Tech Report",
+    "year": 2023,
+    "theme": ["ai", "co-creation"]
+  },
+  {
+    "id": "maeda-neededness",
+    "text": "Before asking if AI can do it, ask if it needs to be done at all.",
+    "source": "Design in Tech Report",
+    "year": 2024,
+    "theme": ["neededness", "ethics"]
+  }
+]
