@@ -228,15 +228,15 @@ export interface UseAsteroids extends GameState {
 
 ## 7. Akzeptanzkriterien
 
-- [ ] Boot-Sequenz läuft beim ersten Besuch (~3 Sek), danach nicht mehr (außer „always" mode).
-- [ ] Boot kann mit Tastendruck/Click skippen.
-- [ ] Replay-Button im Footer startet Boot erneut.
-- [ ] Boot zeigt korrekten Theme-Namen + Anthropic-Status an.
-- [ ] Reduced-Motion: Boot ohne Animation, ~500ms.
-- [ ] Asteroids: Spiel läuft, Schiffe bewegen/schießen, Asteroiden zerfallen.
-- [ ] Maeda-Quotes erscheinen bei ~30% der kleinen Treffer.
-- [ ] High-Score wird in localStorage gespeichert.
-- [ ] Mobile: Touch-Buttons funktionieren.
-- [ ] Game-BGM startet/stoppt mit Spiel.
-- [ ] Theme-Switch während Boot/Spiel wird visuell korrekt angewendet.
-- [ ] Keine neuen npm-Abhängigkeiten.
+- [x] Boot-Sequenz läuft beim ersten Besuch (~3 Sek), danach nicht mehr (außer „always" mode).
+- [x] Boot kann mit Tastendruck/Click skippen.
+- [x] Replay-Button im Footer startet Boot erneut.
+- [x] Boot zeigt korrekten Theme-Namen + Anthropic-Status an.
+- [x] Reduced-Motion: Boot ohne Animation, ~500ms.
+- [x] Asteroids: Spiel läuft, Schiffe bewegen/schießen, Asteroiden zerfallen.
+- [x] Maeda-Quotes erscheinen bei ~30% der kleinen Treffer.
+- [x] High-Score wird in localStorage gespeichert.
+- [x] Mobile: Touch-Buttons funktionieren.
+- [x] Game-BGM startet/stoppt mit Spiel.
+- [x] Theme-Switch während Boot/Spiel wird visuell korrekt angewendet.
+- [x] Keine neuen npm-Abhängigkeiten.
