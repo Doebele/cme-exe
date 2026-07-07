@@ -103,6 +103,35 @@ export interface ApiKeysPutBody {
 }
 
 // ---------------------------------------------------------------------------
+// Analytics shape returned by GET /api/admin/analytics.
+// ---------------------------------------------------------------------------
+
+export interface AnalyticsHostCount {
+  host: string;
+  count: number;
+}
+
+export interface AnalyticsDayCount {
+  date: string;
+  count: number;
+}
+
+export interface AnalyticsSummary {
+  runsTotal: number;
+  runsLast24h: number;
+  runsComplete: number;
+  runsHybrid: number;
+  runsFull: number;
+  runsUnknown: number;
+  urlRuns: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  topSourceHosts: AnalyticsHostCount[];
+  runsPerDay: AnalyticsDayCount[];
+}
+
+// ---------------------------------------------------------------------------
 // Shared UI primitives. All styled to match ApiKeyWidget/Navigation: dark theme,
 // Fira Mono, bordered inputs, accent-colored action buttons.
 // ---------------------------------------------------------------------------

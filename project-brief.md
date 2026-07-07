@@ -105,10 +105,10 @@
 # Current State
 
 ## 6. Status
-- Phase: **Phase 1 (Combo α+) VOLLSTÄNDIG** — alle 5 Stücke gebaut + Docker-deployed. Nächster Schritt: Live-Testing mit echtem Key + Polish/Performance-Optimierung.
-- Gesamtstatus: **on track** — Repo-Scaffold complete, ApiKeyWidget verifiziert, Speedrun-Agent (Backend + Frontend) funktional getestet end-to-end.
-- Aktiver Branch: (Repo lokal, noch nicht initial-commit'ted.)
-- Zuletzt aktualisiert am: 2026-06-29.
+- Phase: **Phase 1 (Combo α+) VOLLSTÄNDIG** — alle 5 Stücke gebaut + Docker-deployed. Admin-Erweiterungen (Content + Analytics) gebaut.
+- Gesamtstatus: **on track** — 9 Admin-Tabs, Invaders-Tempo skaliert mit Browserbreite, Docker live auf Port 8093.
+- Aktiver Branch: `main` auf GitHub (`git@github.com:Doebele/cme-exe.git`).
+- Zuletzt aktualisiert am: 2026-07-07.
 
 ## 7. Was zuletzt gemacht wurde
 - Repo `cme-exe` lokal angelegt unter `/Users/clausmedvesek/Developer/projects/cme-exe`.
@@ -168,6 +168,12 @@
     - [x] **BootSection echten Inhalt statt Stub:** Zeigt jetzt Beschreibung des 56k-Modem-Rituals + „▶ Replay boot sequence" Button + „Skip to speedrun →" Link. Kein „(coming in Phase 1c)" mehr.
     - [x] **Admin-Bereich voll funktionsfähig:** Login (bcrypt + session), 6+1 Tabs: AI Providers (Anthropic/OpenAI Keys encrypted in `data/api-keys.json`, masked preview), Navigation (Section-Reihenfolge + Sichtbarkeit), Theme (Default + Slider), Audio (Sound/Volumen), Behavior (BootMode + Limits), Personas (System-Prompts editierbar), Recordings (siehe unten).
     - [x] **API-Key Backend-Speicherung:** Neue Routes `/api/admin/api-keys` (GET masked, PUT schreibend), in `data/api-keys.json` (gitignored). `lib/claude.js` liest diesen File als Override über env-var. `resetServerClient()` invalidiert Cache nach Key-Update. Sections.json für Nav-Verwaltung.
+  - [x] **Polish Round 6 (Admin-Erweiterungen + Invaders-Skalierung):**
+    - [x] **Space-Invaders horizontales Tempo skaliert mit Browserbreite:** `MARCH_STEP_X` war fix 8 px/Tick — auf breiten Screens brauchte die Formation zu lange für eine Traverse. Jetzt: `marchStepX(viewWidth)` berechnet den Schritt proportional zur View-Breite (Referenz 8 px bei 800 px → 1% der Breite pro Tick). Traverse-Zeit konstant über alle Fenstergrössen. `InvadersCanvas.tsx` + `GameCanvas.tsx` (Asteroids unverändert, dort ist Geschwindigkeit bereits px/s-basiert).
+    - [x] **Neuer Admin-Tab „Content":** Vollständige CRUD-Oberfläche für Design-Quotes (`data/design-quotes.json`, 42 Quotes von Ive, Rams, Vignelli, Scher, Eames, Norman u.v.m.). Add/Edit/Delete, Reihenfolge per Pfeile, Save-Button mit Dirty-Indikator. `ContentTab.tsx` + `useDesignQuotes()` Hook.
+    - [x] **Neuer Admin-Tab „Analytics":** Aggregierte Speedrun-Metriken aus `data/runs/*.json`: Runs Total/24h/Complete, Hybrid vs. Full Breakdown, Input/Output Tokens, Kosten-Estimate (Sonnet-Preise: $3/M input, $15/M output), Top analysierte Sites (Host-Count), 14-Tage-Sparkline + Detail-Tabelle. Backend-Route `GET /api/admin/analytics` liest und aggregiert alle Run-Files. `AnalyticsTab.tsx` + `useAnalytics()` Hook.
+    - [x] **Admin-Dashboard:** 9 Tabs jetzt — AI Providers · Navigation · Theme · Audio · Behavior · Personas · Recordings · **Content** · **Analytics**.
+
     - [x] **Speedrun-Recording-Feature (Kosten-Optimierung):** Pre-recorded Sessions werden in Hybrid-Mode (Besucher ohne API-Key) statt Live-LLM-Run abgespielt. Implementiert via: `data/recordings/` (Permanent-Storage ohne TTL) + `lib/recordings.js` (CRUD + `pickHybridRecording()`) + `routes/recordings.js` (Public GET, Admin POST/PATCH/DELETE). Hybrid-Mode-Shortcut in `/api/speedrun/start`: wenn Recording featured+available → return recording statt live run. Frontend: `useSpeedrun.playRecording()` walks history step-by-step, Badge „⏺ PRE-RECORDED SESSION" in ThoughtStream, Idle-State Note „Hybrid mode plays a pre-recorded session. Add your API key for a fresh live run." Admin Tab „Recordings" mit Promote-Formular (runId → permanent recording), Inline-Edit, Feature-Toggle, Delete.
     - [x] **Oracle Past-Q&A De-emphasis:** Ältere Q&A-Paare verblassen (opacity 0.5, saturate 0.7, font-size 0.85em, dashed separator oben). Aktuelle Q&A bleibt full-strength.
   - [x] **Polish Round 6 (User-Feedback):**
@@ -181,7 +187,7 @@
 - [x] **Phase 1b — Oracle (A) + Prompt→Sketch (B)** ✓ (Docker-deployed, error-handling verifiziert).
 - [x] **Phase 1c — ASCII-Boot + Asteroids + Sound-Layer** ✓ (Docker-deployed, Browser-verifiziert).
 - [ ] Performance: Code-Splitting mit `React.lazy` für Speedrun-Sektion (Tone.js lädt ~140 kB extra, derzeit im Initial-Bundle).
-- [ ] Admin-Bereich mit allen 6 Tabs ausbauen.
+- [x] Admin-Bereich mit allen 9 Tabs ausbauen (AI Providers, Navigation, Theme, Audio, Behavior, Personas, Recordings, Content, Analytics).
 - [ ] Maeda-Quote-Bank kuratieren (~30–50 Quotes).
 - [ ] Higgsfield-Tracks generieren (sonilo_music + mirelo_text_to_audio).
 - [ ] Initial Git-Commit + auf GitHub pushen.
@@ -366,13 +372,16 @@ Wechsel zur Laufzeit via CSS-Variablen, persistiert in localStorage.
 ## A.13 Admin-Bereich
 **Route:** `/admin` (bcrypt + session auth).
 
-**Tabs:**
-1. **Theme & Visual** — Default-Theme, Intensitäts-Slider, Custom-Farben, Live-Preview, Visitor-Theme-Switch erlauben.
-2. **Audio** — Sound default on/off, Master-Volume, Per-Track-Lautstärke, Track-Upload (Higgsfield).
-3. **Personas & Voice** — System-Prompts editierbar, Tone-Parameter, Negative Liste, Test-Run.
-4. **Content** — Fakten-Sheet, Maeda-Quotes (CRUD), Oracle-Default-Antworten.
-5. **Behavior** — Boot-Modus, Speedrun-Dauer, Per-Run-Sharing, Mobile-Variante.
-6. **Analytics & Costs** — API-Counter, Kosten-Estimate, Top-Fragen, Top-Deep-Links, Run-Count.
+**Tabs (9):**
+1. **AI Providers** — Anthropic/OpenAI/Kimi/Z.AI/Gemini/Cursor Keys (masked preview), Default Provider für Hybrid-Mode.
+2. **Navigation** — Section-Reihenfolge + Sichtbarkeit (Pfeile + Checkboxen).
+3. **Theme** — Default-Theme (Vector-Green/CRT-Amber/Y2K), CRT-Intensitäts-Slider (Glow/Scanlines/Noise/Curve).
+4. **Audio** — Sound default on/off, Master-Volume, Per-Track-Lautstärke.
+5. **Behavior** — Boot-Modus, Speedrun-Dauer, Per-Run-Sharing, Mobile-Variante, Game-Variant (Asteroids/Invaders), Hybrid-Rate-Limit, Allowed Providers.
+6. **Personas** — Observer/Machine/Curator System-Prompts editierbar, Tone-Parameter.
+7. **Recordings** — Speedrun-Recordings verwalten (Promote/Feature/Edit/Delete).
+8. **Content** — Design-Quotes CRUD (Add/Edit/Delete/Reorder), 42 kuratierte Quotes.
+9. **Analytics** — Runs Total/24h/Complete, Hybrid vs. Full, Token-Usage, Kosten-Estimate, Top Sites, 14-Tage-Sparkline.
 
 ## A.14 Multi-Site-Ökosystem
 | Domain | Zweck |

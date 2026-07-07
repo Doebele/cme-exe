@@ -7,6 +7,8 @@ import AudioTab from "./tabs/AudioTab";
 import BehaviorTab from "./tabs/BehaviorTab";
 import PersonasTab from "./tabs/PersonasTab";
 import RecordingsTab from "./tabs/RecordingsTab";
+import ContentTab from "./tabs/ContentTab";
+import AnalyticsTab from "./tabs/AnalyticsTab";
 
 export type AdminTabId =
   | "providers"
@@ -15,7 +17,9 @@ export type AdminTabId =
   | "audio"
   | "behavior"
   | "personas"
-  | "recordings";
+  | "recordings"
+  | "content"
+  | "analytics";
 
 interface TabDef {
   id: AdminTabId;
@@ -30,6 +34,8 @@ const TABS: TabDef[] = [
   { id: "behavior", label: "Behavior" },
   { id: "personas", label: "Personas" },
   { id: "recordings", label: "Recordings" },
+  { id: "content", label: "Content" },
+  { id: "analytics", label: "Analytics" },
 ];
 
 export interface AdminDashboardProps {
@@ -88,6 +94,8 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
           {tab === "behavior" && <BehaviorTab />}
           {tab === "personas" && <PersonasTab />}
           {tab === "recordings" && <RecordingsTab />}
+          {tab === "content" && <ContentTab />}
+          {tab === "analytics" && <AnalyticsTab />}
         </div>
       </main>
 

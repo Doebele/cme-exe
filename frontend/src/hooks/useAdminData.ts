@@ -5,8 +5,10 @@ import type {
   ApiKeysResponse,
   NavSection,
   PersonaMap,
+  AnalyticsSummary,
 } from "../components/admin/AdminShared";
 import type { ProviderId } from "../lib/apiKey";
+import type { DesignQuote } from "../types";
 
 // ---------------------------------------------------------------------------
 // Generic read+save primitive. Loads via GET on mount, exposes a save() that
@@ -106,6 +108,11 @@ export function useSettings(): AdminResource<AdminSettings> {
 
 export function usePersonas(): AdminResource<PersonaMap> {
   return useAdminResource<PersonaMap>("/api/content/personas");
+}
+
+// Design quotes — shown in Designer's Quest when invaders/asteroids are hit.
+export function useDesignQuotes(): AdminResource<DesignQuote[]> {
+  return useAdminResource<DesignQuote[]>("/api/content/design-quotes");
 }
 
 // API keys differ: GET returns masked previews; PUT accepts partial updates
@@ -208,5 +215,52 @@ export function useApiKeys(): UseApiKeys {
     saveKey,
     clearKey,
     setDefaultProvider,
+  };
+}
+
+
+// ---------------------------------------------------------------------------
+// Analytics (read-only). Aggregated speedrun metrics from /api/admin/analytics.
+// ---------------------------------------------------------------------------
+
+export interface UseAnalytics {
+  data: AnalyticsSummary | null;
+  isLoading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+
+export function useAnalytics(): UseAnalytics {
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoading(true);
+    fetch("/api/admin/analytics", { credentials: "same-origin" })
+      .then(async (r) => {
+        if (!active) return;
+        if (r.status === 401) return; // not authenticated
+        if (!r.ok) throw new Error(`Load failed (${r.status})`);
+        setData(await r.json());
+      })
+      .catch((e: unknown) => {
+        if (active) setError(e instanceof Error ? e.message : "Load failed");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [nonce]);
+
+  return {
+    data,
+    isLoading,
+    error,
+    refresh: () => setNonce((n) => n + 1),
   };
 }

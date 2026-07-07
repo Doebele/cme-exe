@@ -33,7 +33,15 @@ const INVADER_GAP_X = 14;
 const INVADER_GAP_Y = 16;
 const ROWS = 4;
 const COLS = 8;
-const MARCH_STEP_X = 8; // px per march tick
+// Horizontal march tempo scales with the play-field width so a formation
+// traverses the screen in roughly the same wall-time regardless of how wide
+// the browser window is. Reference: 8 px/tick at an 800 px-wide field.
+const MARCH_REF_WIDTH = 800;
+const MARCH_REF_STEP_X = 8;
+function marchStepX(viewWidth: number): number {
+  const w = Math.max(1, viewWidth);
+  return Math.max(2, (w / MARCH_REF_WIDTH) * MARCH_REF_STEP_X);
+}
 const MARCH_DESCEND_Y = 14; // px when hitting a wall
 const BASE_MARCH_INTERVAL_MS = 720; // tick speed at level 1
 const MIN_MARCH_INTERVAL_MS = 180;
@@ -551,7 +559,7 @@ export default function InvadersCanvas({
             if (iv.x < minX) minX = iv.x;
             if (iv.x > maxX) maxX = iv.x;
           }
-          const stepX = MARCH_STEP_X * marchDirRef.current;
+          const stepX = marchStepX(view.w) * marchDirRef.current;
           let needsDescend = false;
           if (marchDirRef.current === 1 && maxX + stepX + INVADER_W > view.w - 8) {
             needsDescend = true;

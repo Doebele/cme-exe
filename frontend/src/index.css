@@ -2335,3 +2335,171 @@ section#quest kbd {
 .admin-radio.is-disabled input {
   cursor: not-allowed;
 }
+
+/* ---- Admin: Content tab (design quotes) ----------------------------- */
+
+.admin-quote-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.admin-quote-editor__row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.5rem;
+}
+.admin-input--source {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.admin-quote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.admin-quote-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+}
+.admin-quote-item__body {
+  flex: 1;
+  min-width: 0;
+}
+.admin-quote-item__text {
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+  margin: 0 0 0.25rem;
+  line-height: 1.4;
+}
+.admin-quote-item__meta {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--color-text-secondary) 80%, transparent);
+  margin: 0;
+}
+.admin-quote-item__actions {
+  display: inline-flex;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+.admin-arrow--danger:hover:not(:disabled) {
+  border-color: var(--color-accent-secondary);
+  color: var(--color-accent-secondary);
+}
+
+/* ---- Admin: Analytics tab ------------------------------------------- */
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-bg-secondary) 60%, transparent);
+}
+.admin-stat__label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--color-text-secondary) 80%, transparent);
+}
+.admin-stat__value {
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--color-text-primary);
+}
+.admin-stat__hint {
+  font-size: 0.6rem;
+  color: color-mix(in srgb, var(--color-text-secondary) 70%, transparent);
+}
+
+.admin-sparkline {
+  width: 100%;
+  height: 60px;
+  display: block;
+}
+.admin-sparkline rect {
+  fill: var(--color-accent);
+  opacity: 0.85;
+}
+
+.admin-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.admin-mode {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.admin-mode--hybrid {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.admin-mode--full {
+  border-color: var(--color-text-primary);
+  color: var(--color-text-primary);
+}
+.admin-mode--unknown {
+  opacity: 0.6;
+}
+
+.admin-top-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.admin-top-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+  font-size: 0.75rem;
+}
+.admin-top-item__host {
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+.admin-top-item__count {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+}
+.admin-table th {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--color-text-secondary) 80%, transparent);
+}
