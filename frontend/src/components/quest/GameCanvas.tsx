@@ -38,7 +38,6 @@ const SMALL_SCORE = 100;
 const BASE_SPEED = 22;
 const LEVEL_ANNOUNCE_MS = 1500;
 const QUOTE_CHANCE = 0.3;
-const QUOTE_TTL_MS = 2000;
 
 type AsteroidSize = "large" | "medium" | "small";
 
@@ -426,9 +425,11 @@ export default function GameCanvas({
     setActiveQuotes((prev) => [...prev, q]);
     // Pause world while the quote is on screen.
     quotePauseUntilRef.current = performance.now() + durationMs;
+    // Quote stays visible for the full pause duration; the world resumes when
+    // the pause ends. The auto-expire interval also uses durationMs.
     window.setTimeout(() => {
       setActiveQuotes((prev) => prev.filter((item) => item.id !== q.id));
-    }, QUOTE_TTL_MS);
+    }, durationMs);
   }, []);
 
   const fireBullet = useCallback(() => {

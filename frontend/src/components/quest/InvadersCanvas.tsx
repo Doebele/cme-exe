@@ -45,7 +45,6 @@ const SCORE_FRONT_ROW = 30;
 const SCORE_MID_ROW = 20;
 const SCORE_BACK_ROW = 10;
 const QUOTE_CHANCE = 0.3;
-const QUOTE_TTL_MS = 2000;
 const LEVEL_ANNOUNCE_MS = 1500;
 
 interface ViewSize {
@@ -405,9 +404,13 @@ export default function InvadersCanvas({
     };
     setActiveQuotes((prev) => [...prev, q]);
     quotePauseUntilRef.current = performance.now() + durationMs;
+    // Quote stays visible for the full pause duration, then is removed.
+    // The setInterval auto-expire (above) also removes at durationMs, so this
+    // is belt-and-braces, but they MUST use the same value or the quote
+    // vanishes while the world is still paused.
     window.setTimeout(() => {
       setActiveQuotes((prev) => prev.filter((item) => item.id !== q.id));
-    }, QUOTE_TTL_MS);
+    }, durationMs);
   }, []);
 
   const fireBullet = useCallback(() => {

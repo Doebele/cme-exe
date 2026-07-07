@@ -60,17 +60,25 @@
   },
   "behavior": {
     "bootMode": "first-visit",
-    "speedrunDurationSec": 60,
+    "speedrunDurationSeconds": 60,
     "perRunSharing": true,
-    "mobileVariant": true,
-    "gameVariant": "asteroids"
+    "mobileTiktokVariant": true,
+    "hybridRateLimitPerHour": 20,
+    "gameVariant": "invaders",
+    "speedrunDurationSec": 60,
+    "mobileVariant": true
   },
   "experience": {
-    "hybridRateLimitPerHour": 20,
-    "fullModeEnabled": true,
+    "allowFullMode": true,
     "allowedProviders": [
       "anthropic",
-      "openai"
-    ]
+      "openai",
+      "gemini",
+      "kimi",
+      "zai",
+      "cursor"
+    ],
+    "hybridRateLimitPerHour": 20,
+    "fullModeEnabled": true
   }
 }

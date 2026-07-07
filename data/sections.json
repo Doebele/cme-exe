@@ -1,7 +1,1 @@
-[
-  { "id": "boot", "title": "Boot", "visible": true, "order": 0 },
-  { "id": "oracle", "title": "Oracle", "visible": true, "order": 1 },
-  { "id": "observer", "title": "Speedrun", "visible": true, "order": 2 },
-  { "id": "sketch", "title": "Sketch", "visible": true, "order": 3 },
-  { "id": "quest", "title": "Quest", "visible": true, "order": 4 }
-]
+[]
