@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { playBootSound } from "../lib/audio";
+import { playBootSound, initAudio } from "../lib/audio";
 import { themeLabel } from "../lib/themes";
 import type { ThemeId } from "../types";
 
@@ -204,7 +204,7 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
       e.preventDefault();
       skip();
     };
-    const onPointer = () => skip();
+    const onPointer = () => { initAudio().catch(() => {}); skip(); };
     window.addEventListener("keydown", onKey, { once: true });
     window.addEventListener("pointerdown", onPointer, {
       once: true,

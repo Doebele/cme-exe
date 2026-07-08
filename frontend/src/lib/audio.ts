@@ -45,9 +45,12 @@ const subscribers = new Set<(enabled: boolean) => void>();
 
 function readEnabled(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    const stored = localStorage.getItem(STORAGE_KEY);
+    // First visit: no value stored → default ON.
+    // After user toggles: "1" = on, "0" = off.
+    return stored === null ? true : stored === "1";
   } catch {
-    return false;
+    return true; // default on if storage unavailable
   }
 }
 
@@ -191,7 +194,14 @@ export function subscribe(cb: (enabled: boolean) => void): () => void {
  *   5.80s  silence
  */
 export function playBootSound(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  // Lazy-init Tone.js on first sound call. If no user gesture is active,
+  // Tone.start() will silently fail and the sound won't play this time —
+  // the next user interaction (click, key) will succeed.
+  if (!state.initialized) {
+    initAudio().catch(() => { /* may fail without user gesture — ok */ });
+    return;
+  }
   const now = Tone.now();
 
   // Master gain — kept modest so it doesn't drown out the BIOS typewriter.
@@ -368,7 +378,11 @@ const TYPEWRITER_CLICK_MIN_MS = 35;
  * ThoughtStream typewriter.
  */
 export function playTypewriterClick(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  if (!state.initialized) {
+    initAudio().catch(() => { /* no gesture — skip */ });
+    return;
+  }
   const now = Date.now();
   if (now - _lastTypewriterClick < TYPEWRITER_CLICK_MIN_MS) return;
   _lastTypewriterClick = now;
@@ -395,7 +409,11 @@ export function playTypewriterClick(): void {
  * machine is reading / thinking. Idempotent.
  */
 export function startAnalysisNoise(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  if (!state.initialized) {
+    initAudio().catch(() => { /* no gesture — skip */ });
+    return;
+  }
   if (_analysisNoise) return;
   const noise = new Tone.Noise("pink");
   const filter = new Tone.Filter(900, "lowpass");
@@ -438,7 +456,11 @@ const RANDOM_BLIP_MIN_MS = 200;
  * typewriter stream so it feels like a live scanner.
  */
 export function playRandomBlip(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  if (!state.initialized) {
+    initAudio().catch(() => { /* no gesture — skip */ });
+    return;
+  }
   const now = Date.now();
   if (now - _lastBlip < RANDOM_BLIP_MIN_MS) return;
   _lastBlip = now;
@@ -471,7 +493,11 @@ export function playRandomBlip(): void {
  * Laser blip: square wave ramped 800→200Hz over ~150ms.
  */
 export function playShootSound(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  if (!state.initialized) {
+    initAudio().catch(() => { /* no gesture — skip */ });
+    return;
+  }
 
   const osc = new Tone.Oscillator(800, "square").toDestination();
   osc.volume.value = -18;
@@ -487,7 +513,11 @@ export function playShootSound(): void {
  * ~400ms.
  */
 export function playExplosionSound(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.enabled) return;
+  if (!state.initialized) {
+    initAudio().catch(() => { /* no gesture — skip */ });
+    return;
+  }
 
   const filter = new Tone.Filter(1000, "lowpass").toDestination();
   const noise = new Tone.NoiseSynth({

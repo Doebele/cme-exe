@@ -6,8 +6,8 @@ import SoundToggle from "./SoundToggle";
 
 const navLinks = [
   { to: "#boot", label: "Boot" },
-  { to: "#oracle", label: "Oracle" },
   { to: "#observer", label: "Speedrun" },
+  { to: "#oracle", label: "Oracle" },
   { to: "#sketch", label: "Sketch" },
   { to: "#quest", label: "Quest" },
 ];

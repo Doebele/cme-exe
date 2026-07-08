@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import BootSection from "./sections/BootSection";
@@ -71,6 +71,26 @@ export default function Lab() {
     window.addEventListener("cme-exe:replay-boot", onReplay);
     return () => window.removeEventListener("cme-exe:replay-boot", onReplay);
   }, []);
+
+  // After initial boot overlay finishes, scroll past the BootSection hero
+  // to the first real content section so the visitor lands on Speedrun,
+  // not the "CME.exe // BOOT" description text.
+  const initialBootDoneRef = useRef(false);
+  useEffect(() => {
+    if (!booting && !initialBootDoneRef.current) {
+      initialBootDoneRef.current = true;
+      // Only auto-scroll after a *fresh* boot (not replay, not page load
+      // where bootMode is "off" or already booted).
+      try {
+        if (localStorage.getItem(BOOTED_KEY) === "1") {
+          const target = document.getElementById("speedrun") || document.getElementById("observer");
+          if (target) {
+            setTimeout(() => target.scrollIntoView({ behavior: "smooth" }), 300);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }, [booting]);
 
   // On load and on hash change, smooth-scroll to the matching section.
   // Hashes may carry a sub-path (e.g. #observer/r-abc123) — we scroll to the
