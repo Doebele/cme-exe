@@ -21,9 +21,9 @@
     "masterVolume": 0.7,
     "tracks": {
       "boot-glitch": 0.8,
-      "oracle-drone": 0.5,
-      "speedrun-base": 0.6,
-      "discovery-sting": 0.9,
+      "oracle-drone": 0.45,
+      "speedrun-base": 0.3,
+      "discovery-sting": 0.5,
       "sketch-glitter": 0.7,
       "game-bgm": 0.5,
       "ambient-pad": 0.25,

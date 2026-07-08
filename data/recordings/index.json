@@ -1,4 +1,15 @@
 {
   "version": "0.1.0",
-  "recordings": []
+  "recordings": [
+    {
+      "id": "rec-vzzf9v5u9p",
+      "kind": "recording",
+      "sourceKind": "claus",
+      "sourceUrl": null,
+      "title": "cme",
+      "recordedAt": "2026-07-07T14:23:31.047Z",
+      "featured": true,
+      "historyLength": 13
+    }
+  ]
 }

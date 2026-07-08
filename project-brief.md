@@ -26,7 +26,7 @@
 - Dual-Mode AI Experience: Hybrid (default, rate-limited) + Full (visitor's own key, Maeda-style inline widget).
 - Maeda-Quote-Bank (kuratiert, ~30–50 Einträge).
 - Cross-Links zu portfolio./design. (beide Richtungen).
-- Docker-Deployment auf Strato, Domain lab.medvesek.com.
+- Docker-Deployment auf Strato, Domain exe.medvesek.com.
 
 ### Out of Scope (v1)
 - Webcam/Mic-Permission-Features (Phase 2+, siehe D5-b).
@@ -94,10 +94,10 @@
 - **D5 Permissions: D5-b opt-in pro Feature.** Default: keine Permissions. Tür offen für Phase 2.
 - **D6 Sound: D6-b Kuratierte Chiptune-Score via Higgsfield.** 8 Tracks, opt-in.
 - **D7 Content: D7-b Hybrid.** Kuratierte Guardrails + LLM-Improvisation.
-- **D8 URL: D8-b One-Page + Deep-Links + Per-Run-Sharing.** Domain lab.medvesek.com.
+- **D8 URL: D8-b One-Page + Deep-Links + Per-Run-Sharing.** Domain exe.medvesek.com.
 - **D9 Branding: D9-b CME.exe + Personas (Observer/Machine/Curator).**
 - **D10 Art Direction: D10-b Vector-Green default + Multi-Theme (CRT-Amber, Y2K) via Admin.**
-- **D11 Codebase: D11-a Neues Repo `cme-exe`.** Hosting Strato, Domain lab.medvesek.com.
+- **D11 Codebase: D11-a Neues Repo `cme-exe`.** Hosting Strato, Domain exe.medvesek.com.
 - **+ Dual-Mode Experience: Hybrid (default, rate-limited) vs. Full (eigener Key, Maeda-style Widget).**
 
 ---
@@ -106,13 +106,14 @@
 
 ## 6. Status
 - Phase: **Phase 1 (Combo α+) VOLLSTÄNDIG** — alle 5 Stücke gebaut + Docker-deployed. Admin-Erweiterungen (Content + Analytics) gebaut.
-- Gesamtstatus: **on track** — 9 Admin-Tabs, Invaders-Tempo skaliert mit Browserbreite, Docker live auf Port 8093.
-- Aktiver Branch: `main` auf GitHub (`git@github.com:Doebele/cme-exe.git`).
-- Zuletzt aktualisiert am: 2026-07-07.
+- **LIVE: `https://exe.medvesek.com` ist seit 2026-07-07 öffentlich erreichbar** (Strato-VPS, SSL via Let's Encrypt, Auto-Renew aktiv bis 2026-10-05).
+- Gesamtstatus: **on track** — 9 Admin-Tabs, Invaders-Tempo skaliert mit Browserbreite, Produktions-Deployment steht.
+- Aktiver Branch: `main` auf GitHub (`git@github.com:Doebele/cme-exe.git`), lokal + auf dem Server bei Commit `9befff8`.
+- Zuletzt aktualisiert am: 2026-07-08 (Update 3 — Strato-Deployment).
 
 ## 7. Was zuletzt gemacht wurde
 - Repo `cme-exe` lokal angelegt unter `/Users/clausmedvesek/Developer/projects/cme-exe`.
-- Multi-Site-Ökosystem geklärt: portfolio. / design. / lab. (cme-exe).
+- Multi-Site-Ökosystem geklärt: portfolio. / design. / exe. (cme-exe).
 - Alle 11 Entscheidungen (D1–D11) durchgespielt und im Brief dokumentiert.
 - Maeda-API-Key-Pattern analysiert (https://dit-2026-app.john-04e.workers.dev/) — Inline-Widget, Auto-Detection, Status-Badge.
 - Brief von cme-lab § 13 migriert in diesen eigenständigen `project-brief.md`.
@@ -173,6 +174,7 @@
     - [x] **Neuer Admin-Tab „Content":** Vollständige CRUD-Oberfläche für Design-Quotes (`data/design-quotes.json`, 42 Quotes von Ive, Rams, Vignelli, Scher, Eames, Norman u.v.m.). Add/Edit/Delete, Reihenfolge per Pfeile, Save-Button mit Dirty-Indikator. `ContentTab.tsx` + `useDesignQuotes()` Hook.
     - [x] **Neuer Admin-Tab „Analytics":** Aggregierte Speedrun-Metriken aus `data/runs/*.json`: Runs Total/24h/Complete, Hybrid vs. Full Breakdown, Input/Output Tokens, Kosten-Estimate (Sonnet-Preise: $3/M input, $15/M output), Top analysierte Sites (Host-Count), 14-Tage-Sparkline + Detail-Tabelle. Backend-Route `GET /api/admin/analytics` liest und aggregiert alle Run-Files. `AnalyticsTab.tsx` + `useAnalytics()` Hook.
     - [x] **Admin-Dashboard:** 9 Tabs jetzt — AI Providers · Navigation · Theme · Audio · Behavior · Personas · Recordings · **Content** · **Analytics**.
+  - [x] **Live-Verifikation nach Polish Round 6 (unverifizierte Repo-Beobachtung, nicht committed):** `data/recordings/index.json` enthält jetzt eine echte, featured Recording (`rec-vzzf9v5u9p`, sourceKind „claus", 13 Steps) — spricht dafür, dass ein echter Live-Run mit gesetztem `ANTHROPIC_API_KEY` durchgeführt und danach als Hybrid-Recording promoted wurde. `data/settings.json` zeigt zusätzlich per Admin angepasste Audio-Track-Volumes (oracle-drone 0.5→0.45, speedrun-base 0.6→0.3, discovery-sting 0.9→0.5) und `behavior.gameVariant` auf `"invaders"` (statt Default) gestellt. Diese Änderungen liegen als uncommitted Working-Tree-Diff vor — noch nicht eingecheckt.
 
     - [x] **Speedrun-Recording-Feature (Kosten-Optimierung):** Pre-recorded Sessions werden in Hybrid-Mode (Besucher ohne API-Key) statt Live-LLM-Run abgespielt. Implementiert via: `data/recordings/` (Permanent-Storage ohne TTL) + `lib/recordings.js` (CRUD + `pickHybridRecording()`) + `routes/recordings.js` (Public GET, Admin POST/PATCH/DELETE). Hybrid-Mode-Shortcut in `/api/speedrun/start`: wenn Recording featured+available → return recording statt live run. Frontend: `useSpeedrun.playRecording()` walks history step-by-step, Badge „⏺ PRE-RECORDED SESSION" in ThoughtStream, Idle-State Note „Hybrid mode plays a pre-recorded session. Add your API key for a fresh live run." Admin Tab „Recordings" mit Promote-Formular (runId → permanent recording), Inline-Edit, Feature-Toggle, Delete.
     - [x] **Oracle Past-Q&A De-emphasis:** Ältere Q&A-Paare verblassen (opacity 0.5, saturate 0.7, font-size 0.85em, dashed separator oben). Aktuelle Q&A bleibt full-strength.
@@ -181,8 +183,16 @@
     - [x] **Speedrun Analyse-Sound-Layer:** Vier neue Tone.js-Funktionen in `lib/audio.ts`: (1) `playTypewriterClick()` — kurzer Square-Wave-Pluck pro Buchstabe während Typewriter (~25ms, rate-limited auf ~28/sec), (2) `startAnalysisNoise()` / `stopAnalysisNoise()` — kontinuierlicher Pink-Noise mit Lowpass(900Hz) als „Analyse-Hum" während Observer läuft, (3) `playRandomBlip()` — Random Electronic-Blip aus Palette von 5 Frequenzen (660-1760Hz), layerd über Typewriter-Stream. ThoughtStream wired: Typewriter-Clicks während isTyping, Random-Blips alle 280ms mit 35% Wahrscheinlichkeit während Live+Typing, Analysis-Noise startet bei isLive, stoppt beim Verlassen. Respektiert sound-enabled State.
   - [x] **Polish Round 7 (User-Feedback): Speedrun Manifest-Loading Gap Fix.** Bug behoben: zwischen Step-Loop-Ende und Manifest-Load verschwand bisher die Stage (leerer Screen mit nur Start-Screen). Jetzt: showStage schliesst status === "manifest" mit ein, sodass Stage durchgehend sichtbar bleibt. Zusammlich neuer manifestLoading State mit "THE CURATOR IS WRITING / manifest synthesizing..." Overlay (pulse-dot + glow) fuer die 2-5 Sekunden Manifest-Load. Danach nahtloser Fade zum Manifest-Card.
   - [x] **Polish Round 8 (User-Feedback): Speedrun Rate-Limit Bug Fix.** Rate-Limit wurde pro /step gezaehlt (10-12 Hits pro Run), nicht pro /start. Bei Limit 20/Hour war nach 1-2 Live-Runs Schluss. Fix: /step und /manifest rufen resolveMode() nicht mehr auf, nur /start zaehlt. Besucher kann jetzt 20 Runs/Starter. Live verifiziert.
+  - [x] **Polish Round 9: Strato-Deployment live (2026-07-07/08).**
+    - [x] **DNS geklärt & korrigiert:** `exe.medvesek.com` zeigte initial auf falsche Adressen (alter AAAA `2a01:238:20a:202:1157::` + Strato-Standard-A-Record `81.169.145.157`, beide nicht der Ziel-VPS). Im Strato-Panel unter `exe.medvesek.com` → DNS → AAAA-Record auf „Eigene IP-Adresse" `2a02:2479:b2:2d00::1` umgestellt (subdomain-spezifisch, nicht domain-weit — wichtig, da ein domain-weiter Change `portfolio.`/`design.` mit betroffen hätte). Propagation ging schneller als die angekündigten 24h.
+    - [x] **Server-Bestandsaufnahme vor Deploy:** Ziel-VPS (Ubuntu 22.04, Docker 29.2.1, Nginx 1.18, `root`-SSH-Zugang via Key) hostet bereits `fintools.doebele12.de` (Port 3002/3003) und `pensionpal.doebele12.de` — **kein** `cme-lab`/`lab.medvesek.com` aktiv dort, Port 8093 war frei.
+    - [x] **Deploy durchgeführt:** Repo (public) per HTTPS auf den Server geklont (`~/cme-exe`), `.env` per `scp` sicher übertragen (chmod 600), `docker compose up --build -d` → Container `cme-exe` healthy auf Port 8093.
+    - [x] **Nginx + SSL:** Reverse-Proxy-Config nach `cme-lab`-Vorbild angelegt (`/etc/nginx/sites-available/cme-exe`, `proxy_pass http://127.0.0.1:8093`), aktiviert, `certbot --nginx -d exe.medvesek.com` → SSL-Zertifikat aktiv (Let's Encrypt, Auto-Renew, gültig bis 2026-10-05), HTTP→HTTPS-Redirect verifiziert (301).
+    - [x] **Cookie-Security-Fix:** `backend/server.js` hatte `cookie.secure` hart auf `false` — für Produktions-HTTPS gefixt auf `process.env.NODE_ENV === "production"` (Dev bleibt `false`, Prod jetzt `true`). Committed (`9befff8`), gepusht, auf Server redeployed und im laufenden Container verifiziert.
+    - [x] **Verifiziert:** `https://exe.medvesek.com` (200), `/api/health` (`{"ok":true,...,"anthropic":true}`), `/admin` (200), HTTP→HTTPS-Redirect (301), Container-Healthcheck healthy.
+    - [x] **Makefile + backup.sh ergänzt** (Muster aus `fintools-new` übernommen, angepasst an Single-Container + JSON-Storage statt SQLite): `make start/stop/restart/logs/build/backup/restore/clean/health`, `backup.sh` sichert `data/` als `tar.gz` mit 30-Tage-Pruning. `.gitignore` um `backups/*.tar.gz` ergänzt. **Diese Dateien sind lokal noch uncommitted** (siehe §9).
 
-- [ ] **Echten `ANTHROPIC_API_KEY` setzen und Live-Run testen** (nächster Schritt vom User).
+- [x] **Echten `ANTHROPIC_API_KEY` setzen und Live-Run testen** — indirekt bestätigt durch reale, featured Recording in `data/recordings/index.json` (siehe Polish Round 6 Live-Verifikation oben). Explizite User-Bestätigung steht noch aus.
 - [x] **Phase 1a Polish (Option C)** — Mobile TikTok + Marginalia + Discovery-Sting ✓.
 - [x] **Phase 1b — Oracle (A) + Prompt→Sketch (B)** ✓ (Docker-deployed, error-handling verifiziert).
 - [x] **Phase 1c — ASCII-Boot + Asteroids + Sound-Layer** ✓ (Docker-deployed, Browser-verifiziert).
@@ -190,15 +200,22 @@
 - [x] Admin-Bereich mit allen 9 Tabs ausbauen (AI Providers, Navigation, Theme, Audio, Behavior, Personas, Recordings, Content, Analytics).
 - [ ] Maeda-Quote-Bank kuratieren (~30–50 Quotes).
 - [ ] Higgsfield-Tracks generieren (sonilo_music + mirelo_text_to_audio).
-- [ ] Initial Git-Commit + auf GitHub pushen.
-- [ ] Strato-Deployment einrichten (Subdomain lab.medvesek.com).
+- [x] Initial Git-Commit + auf GitHub pushen — Repo lebt auf `main` bei `github.com/Doebele/cme-exe`, mehrere Commits bis `62131f1`. **Achtung:** aktuell zwei uncommitted Änderungen im Working Tree (`data/recordings/index.json`, `data/settings.json`) + eine neue untracked Recording-Datei — noch nicht eingecheckt.
+- [x] **Strato-Deployment einrichten (Subdomain exe.medvesek.com)** — **LIVE seit 2026-07-07/08**, siehe Polish Round 9 oben. SSL aktiv, Container healthy, Cookie-Security gefixt.
 
 ## 9. Offene Punkte
-- **Sicherheit:** Admin-Passwort + Session-Secret + Anthropic-Key vor Prod-Deploy setzen.
+- **Sicherheit:** Admin-Passwort + Session-Secret + Anthropic-Key sind auf dem Server via `.env` gesetzt (siehe Deploy). Spend-Limit bei Anthropic vor öffentlichem Traffic-Push trotzdem noch offen.
 - **Maeda-Quotes:** Kuratierung ausstehend (Default: Agent recherchiert, Claus freigibt).
 - **Voice-Output für Oracle:** Noch offen (Default: Text, Voice optional via Toggle).
 - **Higgsfield-Lizenz:** Kommercial-Rechte für Awards/Public Deployment prüfen.
 - **Kosten-Limit:** Spend-Limit bei Anthropic setzen vor Public Launch.
+- **Uncommitted Working-Tree-Änderungen (Stand 2026-07-08, lokal, noch NICHT auf dem Server-Repo gepullt):**
+  - `Makefile`, `backup.sh` — neu, untracked (siehe Polish Round 9).
+  - `.gitignore` — modifiziert (Backup-Pattern ergänzt).
+  - `project-brief.md` — dieses Update.
+  - `data/recordings/index.json`, `data/settings.json` — Laufzeitdaten (featured Recording „cme", Audio-Volumes, gameVariant „invaders"), plus untracked `data/recordings/rec-vzzf9v5u9p.json`.
+  - Noch zu klären: ob `data/recordings/` versioniert oder gitignored werden soll (wie `data/api-keys.json`). Sobald geklärt, committen + pushen + auf dem Server (`~/cme-exe`) `git pull` + `docker compose up --build -d` für Makefile/backup.sh-Nutzung dort.
+- **Server-Konfiguration nicht im Repo dokumentiert:** Nginx-Config (`/etc/nginx/sites-available/cme-exe`) und Certbot-Zertifikat liegen nur auf dem Server, nicht versioniert. Analog zu `cme-lab/nginx/cme-lab.conf` wäre eine `nginx/cme-exe.conf` im Repo sinnvoll (aktuell nicht vorhanden — nur ad-hoc auf dem Server angelegt).
 
 ## 10. Blocker / Risiken
 - Blocker: **keine** — Grundgerüst steht, kann direkt mit Phase 1a starten.
@@ -210,17 +227,64 @@
   - Nächste Aktion: Strikte CSP, klare Kommunikation an User, optional Direkt-Browser-zu-Provider-Modus.
 
 ## 11. Wie ein neuer Agent übernehmen soll
-1. Diese Datei komplett lesen.
+1. Diese Datei komplett lesen (v. a. §6–9 für aktuellen Stand).
 2. Relevante Pfade prüfen (siehe Abschnitt 4).
-3. Branch / offenen Stand prüfen.
+3. `git status` + `git log --oneline -10` prüfen — **Achtung:** Stand 2026-07-07 gibt es uncommitted Änderungen (siehe §9 „Uncommitted Working-Tree-Änderungen") — vor jeder neuen Aktion erst klären, ob committen oder verwerfen.
 4. Lokal starten: Frontend `npm run dev` (5173), Backend `npm run dev` (8093).
-5. Mit nächstem Schritt aus Abschnitt 8 beginnen (meistens: Phase 1a Speedrun-Agent).
-6. Vor Verlassen diese Datei aktualisieren.
+5. Mit nächster Aufgabe aus Abschnitt 8/§13 beginnen — **Phase 1 (Combo α+) ist komplett**, es geht jetzt um Restarbeiten vor Launch (siehe §13 „Nächste Aufgabe für den Agenten").
+6. Vor Verlassen diese Datei aktualisieren (`/brief-update` oder `/brief-handoff`).
 
 ## 12. Übergabe-Notiz
 - Falls an anderes Tool übergeben wird: Übergib diese `project-brief.md` + `README.md` + cme-lab-Repo (für career.json/works.json als Fakten-Sheet-Quelle).
-- Woran das nächste Tool direkt anschließen soll: Phase 1a (Speedrun-Agent H).
-- Was auf keinen Fall neu entschieden werden soll: Stack (React + Vite + Tailwind v4 + Three.js + p5.js + Tone.js + Express + JSON-Storage bleibt); Combo α+ bleibt; CME.exe-Branding bleibt; Dual-Mode AI Experience bleibt.
+- Woran das nächste Tool direkt anschließen soll: siehe §13 „Nächste Aufgabe für den Agenten" — Phase 1 ist fertig, es sind nur noch Launch-Restarbeiten offen (kein neuer Feature-Build mehr nötig).
+- Was auf keinen Fall neu entschieden werden soll: Stack (React + Vite + Tailwind v4 + Three.js + p5.js + Tone.js + Express + JSON-Storage bleibt); Combo α+ bleibt; CME.exe-Branding bleibt; Dual-Mode AI Experience bleibt; die 11 Entscheidungen D1–D11 (siehe §5) sind final.
+
+## 13. Übergabe an anderes Modell / anderes Tool
+
+**Aktueller Stand (Kurzfassung):** Phase 1 (Combo α+: Oracle, Speedrun-Agent, Prompt→Sketch, ASCII-Boot, Asteroids/Invaders, Sound) ist vollständig gebaut. **`https://exe.medvesek.com` ist LIVE** (Strato-VPS, IPv6 `2a02:2479:b2:2d00::1`, SSH als `root`, Docker-Container `cme-exe` healthy auf Port 8093, Nginx-Reverse-Proxy + Let's Encrypt SSL bis 2026-10-05). Repo ist auf GitHub (`main`, `github.com/Doebele/cme-exe`, lokal + Server bei Commit `9befff8`). Es gibt lokal weiterhin uncommitted Änderungen (siehe §9) — der Server hat den letzten gepushten Stand, aber nicht die neuesten lokalen Makefile/backup.sh-Ergänzungen.
+
+**Was bereits entschieden ist:** Alle 11 Kern-Entscheidungen D1–D11 + Dual-Mode (siehe §5) sind final und sollen nicht neu diskutiert werden. Tech-Stack (§3) ist fix. Admin-Struktur mit 9 Tabs (§A.13) ist final. **Neu:** Deployment-Ziel ist der Strato-VPS mit Docker+Nginx+Certbot (nicht FTP/Shared-Hosting) — analog zum `cme-lab`-Pattern.
+
+**Welche Dateien zuletzt geändert wurden (uncommitted, Stand 2026-07-08):**
+- `Makefile`, `backup.sh` — neu (aus `fintools-new`-Pattern übernommen, siehe §9).
+- `.gitignore` — Backup-Pattern ergänzt.
+- `data/recordings/index.json`, `data/settings.json` — Laufzeitdaten, unverändert seit letztem Update.
+- `data/recordings/rec-vzzf9v5u9p.json` — neu, untracked.
+- **Bereits committed + gepusht + auf dem Server deployed:** `backend/server.js` (`cookie.secure` Production-Fix, Commit `9befff8`).
+
+**Nächste Aufgabe für den Agenten (in Prioritätsreihenfolge):**
+1. Uncommitted Änderungen klären: committen (inkl. Makefile/backup.sh) oder `data/recordings/` (wie `data/api-keys.json`) gitignoren — danach auf dem Server `git pull && docker compose up --build -d`, damit Server und Repo wieder synchron sind.
+2. Erwägen, die Nginx-Config als `nginx/cme-exe.conf` ins Repo aufzunehmen (aktuell nur ad-hoc auf dem Server unter `/etc/nginx/sites-available/cme-exe`, nicht versioniert — siehe §9).
+3. Restliche offene Punkte aus §8 abarbeiten, empfohlene Reihenfolge:
+   - Performance: `React.lazy` Code-Splitting für Speedrun-Sektion (Tone.js ~140 kB aus Initial-Bundle raus).
+   - Higgsfield-Tracks final generieren (`sonilo_music` + `mirelo_text_to_audio`) — aktuell nur Platzhalter-Audiodateien referenziert in `settings.json`.
+   - Design-Quote-Bank auf ~30–50 finalisieren (aktuell 42 in `data/design-quotes.json`, Kuratierung/Freigabe durch Claus noch offen).
+4. Vor Public-Launch (breiterer Traffic-Push): Anthropic Spend-Limit setzen (siehe §9 Sicherheit).
+
+**Offene Fragen:**
+- Soll `data/recordings/` versioniert werden oder gitignored (Runtime-Daten vs. Repo-Sauberkeit)?
+- Voice-Output für Oracle: ja/nein, wenn ja welcher TTS-Provider?
+- Higgsfield-Lizenz für kommerzielle Nutzung (Awards/Public) geklärt?
+- Soll die Server-Nginx-Config ins Repo aufgenommen werden (Konsistenz mit `cme-lab/nginx/cme-lab.conf`)?
+
+### Copy-Paste-Kurzbriefing
+```
+Projekt: CME.exe — AI × Design Lab (experimentelle Award-Site von Claus Medvesek, Full Art Piece D1-c).
+Repo: /Users/clausmedvesek/Developer/projects/cme-exe (GitHub: Doebele/cme-exe, Branch main).
+LIVE: https://exe.medvesek.com (Strato-VPS 2a02:2479:b2:2d00::1, root-SSH, Docker-Container
+"cme-exe" auf Port 8093, Nginx-Reverse-Proxy, Let's Encrypt SSL bis 2026-10-05, Auto-Renew).
+Stand: Phase 1 (Combo α+: Oracle-Terminal, Speedrun-Agent, Prompt→Sketch, ASCII-Boot,
+Asteroids/Invaders-Game, Chiptune-Sound) ist komplett gebaut, getestet, deployed.
+Admin-Bereich /admin mit 9 Tabs fertig (AI Providers, Navigation, Theme,
+Audio, Behavior, Personas, Recordings, Content, Analytics).
+Stack: React 19 + TS + Vite + Tailwind v4 + three.js + p5.js + Tone.js + xterm.js
+(Frontend) / Node 20 + Express + JSON-Storage (Backend). Nicht ändern.
+Offen: uncommitted Daten-Änderungen klären (data/recordings/, data/settings.json, neues
+Makefile/backup.sh), Nginx-Config ins Repo aufnehmen, Server danach neu synchronisieren,
+Performance-Code-Splitting, Higgsfield-Sound-Tracks final generieren, Design-Quote-Bank
+kuratieren, Anthropic-Spend-Limit setzen vor breiterem Public-Launch.
+Volle Details, alle 11 Entscheidungen (D1–D11) und Appendix-Specs: siehe project-brief.md.
+```
 
 ---
 
@@ -388,7 +452,7 @@ Wechsel zur Laufzeit via CSS-Variablen, persistiert in localStorage.
 |--------|-------|
 | portfolio.medvesek.com | Klassisches Portfolio |
 | design.medvesek.com | Freelance-Projekte (cme-lab Repo) |
-| **lab.medvesek.com** | **CME.exe — dieses Repo** |
+| **exe.medvesek.com** | **CME.exe — dieses Repo** |
 
 Cross-Links in beide Richtungen erwünscht.
 

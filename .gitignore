@@ -12,3 +12,6 @@ data/runs/*.json
 # Admin-set API keys (never commit)
 data/api-keys.json
 .env.bak
+
+# Local backups
+backups/*.tar.gz
