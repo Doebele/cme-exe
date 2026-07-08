@@ -108,8 +108,9 @@
 - Phase: **Phase 1 (Combo α+) VOLLSTÄNDIG** — alle 5 Stücke gebaut + Docker-deployed. Admin-Erweiterungen (Content + Analytics) gebaut.
 - **LIVE: `https://exe.medvesek.com` ist seit 2026-07-07 öffentlich erreichbar** (Strato-VPS, SSL via Let's Encrypt, Auto-Renew aktiv bis 2026-10-05).
 - Gesamtstatus: **on track** — 9 Admin-Tabs, Invaders-Tempo skaliert mit Browserbreite, Produktions-Deployment steht.
-- Aktiver Branch: `main` auf GitHub (`git@github.com:Doebele/cme-exe.git`), lokal + auf dem Server bei Commit `9befff8`.
-- Zuletzt aktualisiert am: 2026-07-08 (Update 3 — Strato-Deployment).
+- Aktiver Branch: `main` auf GitHub (`git@github.com:Doebele/cme-exe.git`), lokal + auf dem Server **synchron bei Commit `7d3b4d3`**. Working Tree lokal und auf dem Server sauber (keine uncommitted Änderungen).
+- Zuletzt aktualisiert am: 2026-07-08 (Update 5 — Handoff-Refresh via `/brief-handoff`).
+- **Zuletzt validiert am 2026-07-08:** lokaler Docker-Container `cme-exe` healthy auf Port 8093; `https://exe.medvesek.com/api/health` → HTTP 200; `git status` clean (nur diese Brief-Datei modifiziert); `main` == `origin/main` == `7d3b4d3`.
 
 ## 7. Was zuletzt gemacht wurde
 - Repo `cme-exe` lokal angelegt unter `/Users/clausmedvesek/Developer/projects/cme-exe`.
@@ -209,12 +210,8 @@
 - **Voice-Output für Oracle:** Noch offen (Default: Text, Voice optional via Toggle).
 - **Higgsfield-Lizenz:** Kommercial-Rechte für Awards/Public Deployment prüfen.
 - **Kosten-Limit:** Spend-Limit bei Anthropic setzen vor Public Launch.
-- **Uncommitted Working-Tree-Änderungen (Stand 2026-07-08, lokal, noch NICHT auf dem Server-Repo gepullt):**
-  - `Makefile`, `backup.sh` — neu, untracked (siehe Polish Round 9).
-  - `.gitignore` — modifiziert (Backup-Pattern ergänzt).
-  - `project-brief.md` — dieses Update.
-  - `data/recordings/index.json`, `data/settings.json` — Laufzeitdaten (featured Recording „cme", Audio-Volumes, gameVariant „invaders"), plus untracked `data/recordings/rec-vzzf9v5u9p.json`.
-  - Noch zu klären: ob `data/recordings/` versioniert oder gitignored werden soll (wie `data/api-keys.json`). Sobald geklärt, committen + pushen + auf dem Server (`~/cme-exe`) `git pull` + `docker compose up --build -d` für Makefile/backup.sh-Nutzung dort.
+- **Working Tree synchron (erledigt 2026-07-08):** Makefile/backup.sh/.gitignore/Daten-Files committed (`7d3b4d3`), gepusht, Server per `git pull` + `docker compose up --build -d` redeployed und healthy verifiziert. Beim Server-Pull gab es einen erwarteten Konflikt in `data/settings.json` — der Server-Container hatte beim Erststart selbstständig zusätzliche Theme-Default-Felder (`glowStrength`, `defaultTheme` etc.) nachgetragen; das war reines Backend-Normalisierungs-Rauschen (keine echten Admin-Eingaben, da Audio-Werte noch auf alten Defaults standen), daher verworfen zugunsten der Git-Version.
+- **Noch offen:** Soll `data/recordings/` grundsätzlich versioniert werden oder gitignored (wie `data/api-keys.json`)? Aktuell wird es weiter committed.
 - **Server-Konfiguration nicht im Repo dokumentiert:** Nginx-Config (`/etc/nginx/sites-available/cme-exe`) und Certbot-Zertifikat liegen nur auf dem Server, nicht versioniert. Analog zu `cme-lab/nginx/cme-lab.conf` wäre eine `nginx/cme-exe.conf` im Repo sinnvoll (aktuell nicht vorhanden — nur ad-hoc auf dem Server angelegt).
 
 ## 10. Blocker / Risiken
@@ -229,7 +226,7 @@
 ## 11. Wie ein neuer Agent übernehmen soll
 1. Diese Datei komplett lesen (v. a. §6–9 für aktuellen Stand).
 2. Relevante Pfade prüfen (siehe Abschnitt 4).
-3. `git status` + `git log --oneline -10` prüfen — **Achtung:** Stand 2026-07-07 gibt es uncommitted Änderungen (siehe §9 „Uncommitted Working-Tree-Änderungen") — vor jeder neuen Aktion erst klären, ob committen oder verwerfen.
+3. `git status` + `git log --oneline -10` prüfen — Stand 2026-07-08: Working Tree lokal + Server sauber, beide synchron bei `7d3b4d3`.
 4. Lokal starten: Frontend `npm run dev` (5173), Backend `npm run dev` (8093).
 5. Mit nächster Aufgabe aus Abschnitt 8/§13 beginnen — **Phase 1 (Combo α+) ist komplett**, es geht jetzt um Restarbeiten vor Launch (siehe §13 „Nächste Aufgabe für den Agenten").
 6. Vor Verlassen diese Datei aktualisieren (`/brief-update` oder `/brief-handoff`).
@@ -241,25 +238,21 @@
 
 ## 13. Übergabe an anderes Modell / anderes Tool
 
-**Aktueller Stand (Kurzfassung):** Phase 1 (Combo α+: Oracle, Speedrun-Agent, Prompt→Sketch, ASCII-Boot, Asteroids/Invaders, Sound) ist vollständig gebaut. **`https://exe.medvesek.com` ist LIVE** (Strato-VPS, IPv6 `2a02:2479:b2:2d00::1`, SSH als `root`, Docker-Container `cme-exe` healthy auf Port 8093, Nginx-Reverse-Proxy + Let's Encrypt SSL bis 2026-10-05). Repo ist auf GitHub (`main`, `github.com/Doebele/cme-exe`, lokal + Server bei Commit `9befff8`). Es gibt lokal weiterhin uncommitted Änderungen (siehe §9) — der Server hat den letzten gepushten Stand, aber nicht die neuesten lokalen Makefile/backup.sh-Ergänzungen.
+> **HANDOFF (2026-07-08).** *Was das Projekt ist:* CME.exe — eigenständige, experimentelle „AI × Design Lab"-Website von Claus Medvesek (Full Art Piece, Combo α+: Oracle-Terminal, Speedrun-Agent, Prompt→Sketch, ASCII-Boot, Asteroids/Invaders-Game, Chiptune-Sound). *Was schon fertig ist:* Phase 1 vollständig gebaut, getestet, deployed; live unter <https://exe.medvesek.com>; Admin-Bereich mit 9 Tabs; Repo auf GitHub `Doebele/cme-exe`, `main` synchron lokal + Server bei `7d3b4d3`, Working Tree clean. *Was blockiert/ungewiss ist:* nichts Blockierendes — nur optionale Restarbeiten (siehe unten). *Was als Nächstes passieren sollte:* die priorisierten Launch-Restarbeiten in §13 abarbeiten; vor größerem Traffic-Push Anthropic-Spend-Limit setzen.
+
+**Aktueller Stand (Kurzfassung):** Phase 1 (Combo α+: Oracle, Speedrun-Agent, Prompt→Sketch, ASCII-Boot, Asteroids/Invaders, Sound) ist vollständig gebaut. **`https://exe.medvesek.com` ist LIVE** (Strato-VPS, IPv6 `2a02:2479:b2:2d00::1`, SSH als `root`, Docker-Container `cme-exe` healthy auf Port 8093, Nginx-Reverse-Proxy + Let's Encrypt SSL bis 2026-10-05). Repo ist auf GitHub (`main`, `github.com/Doebele/cme-exe`) — **lokal und Server synchron bei Commit `7d3b4d3`**, Working Tree an beiden Orten sauber.
 
 **Was bereits entschieden ist:** Alle 11 Kern-Entscheidungen D1–D11 + Dual-Mode (siehe §5) sind final und sollen nicht neu diskutiert werden. Tech-Stack (§3) ist fix. Admin-Struktur mit 9 Tabs (§A.13) ist final. **Neu:** Deployment-Ziel ist der Strato-VPS mit Docker+Nginx+Certbot (nicht FTP/Shared-Hosting) — analog zum `cme-lab`-Pattern.
 
-**Welche Dateien zuletzt geändert wurden (uncommitted, Stand 2026-07-08):**
-- `Makefile`, `backup.sh` — neu (aus `fintools-new`-Pattern übernommen, siehe §9).
-- `.gitignore` — Backup-Pattern ergänzt.
-- `data/recordings/index.json`, `data/settings.json` — Laufzeitdaten, unverändert seit letztem Update.
-- `data/recordings/rec-vzzf9v5u9p.json` — neu, untracked.
-- **Bereits committed + gepusht + auf dem Server deployed:** `backend/server.js` (`cookie.secure` Production-Fix, Commit `9befff8`).
+**Welche Dateien zuletzt geändert wurden:** Keine uncommitted Änderungen mehr — letzter Commit `7d3b4d3` (Makefile, backup.sh, `.gitignore`, Daten-Files, Brief-Update) ist committed, gepusht und auf dem Server deployed. `cookie.secure`-Production-Fix (`9befff8`) ebenfalls live.
 
 **Nächste Aufgabe für den Agenten (in Prioritätsreihenfolge):**
-1. Uncommitted Änderungen klären: committen (inkl. Makefile/backup.sh) oder `data/recordings/` (wie `data/api-keys.json`) gitignoren — danach auf dem Server `git pull && docker compose up --build -d`, damit Server und Repo wieder synchron sind.
-2. Erwägen, die Nginx-Config als `nginx/cme-exe.conf` ins Repo aufzunehmen (aktuell nur ad-hoc auf dem Server unter `/etc/nginx/sites-available/cme-exe`, nicht versioniert — siehe §9).
-3. Restliche offene Punkte aus §8 abarbeiten, empfohlene Reihenfolge:
+1. Erwägen, die Nginx-Config als `nginx/cme-exe.conf` ins Repo aufzunehmen (aktuell nur ad-hoc auf dem Server unter `/etc/nginx/sites-available/cme-exe`, nicht versioniert — siehe §9).
+2. Restliche offene Punkte aus §8 abarbeiten, empfohlene Reihenfolge:
    - Performance: `React.lazy` Code-Splitting für Speedrun-Sektion (Tone.js ~140 kB aus Initial-Bundle raus).
    - Higgsfield-Tracks final generieren (`sonilo_music` + `mirelo_text_to_audio`) — aktuell nur Platzhalter-Audiodateien referenziert in `settings.json`.
    - Design-Quote-Bank auf ~30–50 finalisieren (aktuell 42 in `data/design-quotes.json`, Kuratierung/Freigabe durch Claus noch offen).
-4. Vor Public-Launch (breiterer Traffic-Push): Anthropic Spend-Limit setzen (siehe §9 Sicherheit).
+3. Vor Public-Launch (breiterer Traffic-Push): Anthropic Spend-Limit setzen (siehe §9 Sicherheit).
 
 **Offene Fragen:**
 - Soll `data/recordings/` versioniert werden oder gitignored (Runtime-Daten vs. Repo-Sauberkeit)?
