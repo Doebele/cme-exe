@@ -164,6 +164,10 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
 
   // Phase sequencing.
   useEffect(() => {
+    // Phase 0 (click-to-enter gate) has no auto-advance — it waits for the
+    // enter-gate effect to call setPhase(1). Without this early return, phase 0
+    // falls through to the phase===4 block and calls onDone immediately.
+    if (phase === 0) return;
     if (reduced) {
       // Reduced-motion: show everything immediately, short hold, fade.
       const t = window.setTimeout(() => setPhase(4), REDUCED_TOTAL_MS - PHASE_DURATIONS.fade);
@@ -212,9 +216,15 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
   }, [phase, reduced, onDone]);
 
   // Skip (phases 1-3): click or key drops to fade-out.
+  // A short grace period after each phase change prevents the same pointer
+  // event that triggered the phase transition (e.g. the enter-gate click)
+  // from immediately skipping the boot.
   useEffect(() => {
     if (phase === 0) return; // phase 0 has its own enter handler
+    const armedAt = performance.now();
+    const GRACE_MS = 400;
     const skip = () => {
+      if (performance.now() - armedAt < GRACE_MS) return;
       setBiosVisibleLines(BIOS_LINES_BASE.length);
       setPhase(4);
     };

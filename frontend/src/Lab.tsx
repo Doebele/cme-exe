@@ -19,6 +19,8 @@ const BOOTED_KEY = "cme_exe_booted";
 // Module-scope cache so the boot-mode probe runs at most once per session.
 let cachedBootMode: BootMode | null = null;
 let bootModePromise: Promise<BootMode> | null = null;
+// Guard: ensures the boot-mode effect fires at most once even under StrictMode.
+let bootModeResolved = false;
 
 function fetchBootMode(): Promise<BootMode> {
   if (cachedBootMode) return Promise.resolve(cachedBootMode);
@@ -50,18 +52,14 @@ function shouldBootInitially(mode: BootMode): boolean {
 export default function Lab() {
   const [booting, setBooting] = useState<boolean>(false);
 
-  // Resolve initial boot state from settings. The fetch is module-cached so
-  // StrictMode's double-invoke in dev is harmless — both calls resolve to the
-  // same mode and idempotently flip `booting`.
+  // Resolve initial boot state from settings. Uses a module-level guard so
+  // StrictMode's double-invoke is harmless — booting is set at most once.
   useEffect(() => {
-    let active = true;
+    if (bootModeResolved) return;
+    bootModeResolved = true;
     void fetchBootMode().then((mode) => {
-      if (!active) return;
       if (shouldBootInitially(mode)) setBooting(true);
     });
-    return () => {
-      active = false;
-    };
   }, []);
 
   // Replay button (in Footer) dispatches a custom event to re-trigger boot
