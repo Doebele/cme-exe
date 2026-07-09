@@ -81,6 +81,27 @@ interface Colors {
   secondary: string;
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Linear mix of two hex colours, t in 0..1. */
+function mixHex(a: string, b: string, t: number): string {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  const r = Math.round(ca[0] + (cb[0] - ca[0]) * t);
+  const g = Math.round(ca[1] + (cb[1] - ca[1]) * t);
+  const bl = Math.round(ca[2] + (cb[2] - ca[2]) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
 function readColors(): Colors {
   const cs = getComputedStyle(document.documentElement);
   const read = (n: string, f: string) => cs.getPropertyValue(n).trim() || f;
@@ -198,15 +219,14 @@ export default function OutrunHeroCanvas() {
       distance += SPEED;
       twinkle += 0.05;
 
-      // --- Sky gradient (dark → warm at horizon) ---
+      // --- Sky gradient: dark bg → subtle primary tint at horizon (theme) ---
       const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
       skyGrad.addColorStop(0, colors.bg);
-      skyGrad.addColorStop(0.7, "#1a0a2e");
-      skyGrad.addColorStop(1, "#3a1a4a");
+      skyGrad.addColorStop(1, mixHex(colors.bg, colors.primary, 0.12));
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, w, horizonY);
 
-      // --- Stars ---
+      // --- Stars (white dots, twinkling) ---
       for (const star of stars) {
         const tw = (Math.sin(twinkle + star.ph) + 1) / 2;
         ctx.globalAlpha = 0.4 + tw * 0.6;
@@ -215,58 +235,80 @@ export default function OutrunHeroCanvas() {
       }
       ctx.globalAlpha = 1;
 
-      // --- Sun with scanline slits (retrowave signature) ---
-      const sunR = Math.min(w, h) * 0.16;
+      // --- Sun as glowing concentric vector rings with horizontal slits ---
+      const sunR = Math.min(w, h) * 0.15;
       const sunCx = cx;
-      const sunCy = horizonY - sunR * 0.4;
-      const sunGrad = ctx.createLinearGradient(0, sunCy - sunR, 0, sunCy + sunR);
-      sunGrad.addColorStop(0, "#ffeb6b");
-      sunGrad.addColorStop(0.5, "#ff7e5f");
-      sunGrad.addColorStop(1, "#ff2e88");
-      ctx.fillStyle = sunGrad;
-      ctx.beginPath();
-      ctx.arc(sunCx, sunCy, sunR, 0, Math.PI * 2);
-      ctx.fill();
-      // Scanline slits — bars get thicker towards the bottom.
+      const sunCy = horizonY - sunR * 0.35;
+      // Soft halo behind the rings
+      const halo = ctx.createRadialGradient(sunCx, sunCy, sunR * 0.4, sunCx, sunCy, sunR * 2.4);
+      halo.addColorStop(0, withAlpha(colors.primary, 0.18));
+      halo.addColorStop(1, withAlpha(colors.primary, 0));
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, w, horizonY);
+      // Concentric glowing rings in primary colour
+      ctx.strokeStyle = colors.primary;
+      ctx.shadowColor = colors.primary;
+      ctx.lineWidth = 1.5;
+      const ringCount = 5;
+      for (let r = 0; r < ringCount; r++) {
+        const rr = sunR * (1 - r / ringCount * 0.85);
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.5 + (r / ringCount) * 0.4;
+        ctx.beginPath();
+        ctx.arc(sunCx, sunCy, rr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      // Horizontal vector slits across the sun (retrowave bars), bg-coloured
       ctx.fillStyle = colors.bg;
-      ctx.globalCompositeOperation = "source-over";
-      for (let i = 0; i < 8; i++) {
-        const t = i / 8;
-        const barY = sunCy + sunR * (0.15 + t * 0.85);
-        const barH = 2 + t * t * 8;
-        // Clip to circle
+      for (let i = 0; i < 7; i++) {
+        const t = i / 7;
+        const barY = sunCy + sunR * (0.1 + t * 0.9);
+        const barH = 1.5 + t * t * 6;
         const dy = barY - sunCy;
         if (Math.abs(dy) > sunR) continue;
         const halfW = Math.sqrt(sunR * sunR - dy * dy);
         ctx.fillRect(sunCx - halfW, barY, halfW * 2, barH);
       }
-      // Sun glow halo
-      const halo = ctx.createRadialGradient(sunCx, sunCy, sunR * 0.5, sunCx, sunCy, sunR * 2.2);
-      halo.addColorStop(0, "rgba(255,100,140,0.25)");
-      halo.addColorStop(1, "rgba(255,100,140,0)");
-      ctx.fillStyle = halo;
-      ctx.fillRect(0, 0, w, horizonY);
 
-      // --- Distant mountain silhouettes ---
-      ctx.fillStyle = "rgba(20,8,40,0.85)";
+      // --- Distant mountains as a glowing vector polyline (no warm fill) ---
+      ctx.strokeStyle = colors.secondary;
+      ctx.shadowColor = colors.secondary;
+      ctx.shadowBlur = 5;
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.7;
       ctx.beginPath();
-      ctx.moveTo(0, horizonY);
-      const mtnPeaks = 14;
+      const mtnPeaks = 16;
+      const ridge: { x: number; y: number }[] = [];
       for (let i = 0; i <= mtnPeaks; i++) {
         const mx = (i / mtnPeaks) * w;
         const variation = Math.sin(i * 1.7) * 0.5 + Math.cos(i * 2.3) * 0.5;
-        const peakH = (0.04 + Math.abs(variation) * 0.06) * h;
+        const peakH = (0.03 + Math.abs(variation) * 0.05) * h;
+        ridge.push({ x: mx, y: horizonY - peakH });
+      }
+      ctx.moveTo(ridge[0]!.x, ridge[0]!.y);
+      for (const p of ridge) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      // Faint secondary ridge line for depth
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      for (let i = 0; i <= mtnPeaks; i++) {
+        const mx = (i / mtnPeaks) * w + 30;
+        const variation = Math.sin(i * 2.1 + 1) * 0.5 + Math.cos(i * 1.6) * 0.5;
+        const peakH = (0.02 + Math.abs(variation) * 0.035) * h;
         ctx.lineTo(mx, horizonY - peakH);
-        ctx.lineTo(mx + w / mtnPeaks / 2, horizonY);
       }
       ctx.lineTo(w, horizonY);
-      ctx.closePath();
-      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
 
-      // --- Floor: base fill ---
+      // --- Floor: base fill in bg with faint primary tint ---
       const floorGrad = ctx.createLinearGradient(0, horizonY, 0, h);
-      floorGrad.addColorStop(0, "#0a0014");
-      floorGrad.addColorStop(1, "#16002a");
+      floorGrad.addColorStop(0, colors.bg);
+      floorGrad.addColorStop(1, mixHex(colors.bg, colors.primary, 0.05));
       ctx.fillStyle = floorGrad;
       ctx.fillRect(0, horizonY, w, h - horizonY);
 
@@ -347,11 +389,11 @@ export default function OutrunHeroCanvas() {
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
 
-      // --- Horizon glow line ---
+      // --- Horizon glow line (theme primary) ---
       const horGlow = ctx.createLinearGradient(0, horizonY - 2, 0, horizonY + 2);
-      horGlow.addColorStop(0, "rgba(255,46,136,0)");
-      horGlow.addColorStop(0.5, "rgba(255,46,136,0.6)");
-      horGlow.addColorStop(1, "rgba(255,46,136,0)");
+      horGlow.addColorStop(0, withAlpha(colors.primary, 0));
+      horGlow.addColorStop(0.5, withAlpha(colors.primary, 0.6));
+      horGlow.addColorStop(1, withAlpha(colors.primary, 0));
       ctx.fillStyle = horGlow;
       ctx.fillRect(0, horizonY - 2, w, 4);
 

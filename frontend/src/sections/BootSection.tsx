@@ -1,4 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useAudio } from "../hooks/useAudio";
+import { startAmbientBed, stopAmbientBed, setAmbientVolume } from "../lib/audio";
+import { AMBIENT_CONFIGS } from "../lib/ambientConfigs";
 import BootHeroCanvas from "../components/BootHeroCanvas";
 import ConsoleHeroCanvas from "../components/ConsoleHeroCanvas";
 import RotatingWireframeHeroCanvas from "../components/RotatingWireframeHeroCanvas";
@@ -40,6 +43,38 @@ interface PoolResponse {
 export default function BootSection() {
   const [animation, setAnimation] = useState<HeroAnimationId>("ascii-materialize");
   const [toast, setToast] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState(1); // 0..1 intersection ratio
+  const sectionRef = useRef<HTMLElement>(null);
+  const { enabled, initialized } = useAudio();
+
+  // Track scroll visibility of the boot section → fade ambient bed.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const r = entries[0]?.intersectionRatio ?? 0;
+        setVisibility(r);
+      },
+      { threshold: [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1] },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // Start/stop the ambient bed based on readiness + visibility threshold.
+  const shouldPlay = enabled && initialized && visibility > 0.05;
+  useEffect(() => {
+    if (shouldPlay) {
+      startAmbientBed(AMBIENT_CONFIGS[animation] ?? AMBIENT_CONFIGS["ascii-materialize"]!);
+      return () => stopAmbientBed();
+    }
+  }, [shouldPlay, animation]);
+
+  // Volume tracks visibility (smooth scroll fade).
+  useEffect(() => {
+    setAmbientVolume(shouldPlay ? visibility : 0);
+  }, [visibility, shouldPlay]);
 
   // Pick a random animation from the pool on mount.
   useEffect(() => {
@@ -84,7 +119,7 @@ export default function BootSection() {
   }, []);
 
   return (
-    <section id="boot" className="relative min-h-screen flex flex-col">
+    <section id="boot" ref={sectionRef} className="relative min-h-screen flex flex-col">
       {animation === "ascii-materialize" && <BootHeroCanvas />}
       {animation === "console-boot" && <ConsoleHeroCanvas />}
       {animation === "rotating-wireframe" && <RotatingWireframeHeroCanvas />}

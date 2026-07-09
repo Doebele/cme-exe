@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   initAudio,
+  isInitialized,
   isEnabled,
   playDiscoverySting,
   setEnabled,
   subscribe,
+  subscribeInit,
 } from "../lib/audio";
 
 export interface UseAudio {
   enabled: boolean;
+  initialized: boolean;
   toggle: () => Promise<void>;
   playDiscoverySting: () => void;
 }
@@ -20,9 +23,17 @@ export interface UseAudio {
  */
 export function useAudio(): UseAudio {
   const [enabled, setEnabledState] = useState(isEnabled);
+  const [initialized, setInitialized] = useState(isInitialized);
 
   useEffect(() => {
     const unsub = subscribe((next) => setEnabledState(next));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    // If already initialised, reflect immediately.
+    if (isInitialized()) setInitialized(true);
+    const unsub = subscribeInit(() => setInitialized(true));
     return unsub;
   }, []);
 
@@ -41,6 +52,7 @@ export function useAudio(): UseAudio {
 
   return {
     enabled,
+    initialized,
     toggle,
     playDiscoverySting,
   };

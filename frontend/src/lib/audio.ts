@@ -42,6 +42,126 @@ const state: AudioState = {
 };
 
 const subscribers = new Set<(enabled: boolean) => void>();
+const initSubscribers = new Set<() => void>();
+
+function notifyInit(): void {
+  for (const cb of initSubscribers) cb();
+}
+
+// --- Ambient bed system --------------------------------------------------
+// Each hero animation ships a quiet ambient bed config. The bed is created
+// only when audio is enabled + initialized, and its volume tracks the boot
+// section's scroll visibility (fades out as the user scrolls away).
+
+export type OscType = "sine" | "square" | "triangle" | "sawtooth";
+export type NoiseColor = "white" | "pink" | "brown";
+export type FilterType = "lowpass" | "bandpass" | "highpass";
+
+export interface AmbientOsc { freq: number; type: OscType; detune?: number; gain: number; }
+export interface AmbientNoise {
+  type: NoiseColor;
+  filterFreq: number;
+  filterType?: FilterType;
+  q?: number;
+  gain: number;
+}
+export interface AmbientConfig {
+  masterGain: number;
+  oscs: AmbientOsc[];
+  noise?: AmbientNoise;
+  sweep?: { rate: number; depth: number }; // LFO modulating the noise filter
+}
+
+let ambientMaster: Tone.Gain | null = null;
+let ambientNodes: Array<{ dispose: () => void }> = [];
+let ambientCurrentConfig: AmbientConfig | null = null;
+
+/** Start (or replace) the ambient bed. No-op if disabled or not initialized. */
+export function startAmbientBed(config: AmbientConfig): void {
+  if (!state.enabled || !state.initialized) return;
+  // If already playing the same config, just restore volume.
+  if (ambientMaster && ambientCurrentConfig === config) {
+    setAmbientVolume(config.masterGain);
+    return;
+  }
+  stopAmbientBed();
+  ambientCurrentConfig = config;
+
+  const master = new Tone.Gain(0);
+  master.toDestination();
+  ambientMaster = master;
+
+  for (const o of config.oscs) {
+    const osc = new Tone.Oscillator(o.freq, o.type);
+    if (o.detune) osc.detune.value = o.detune;
+    const g = new Tone.Gain(o.gain);
+    osc.connect(g);
+    g.connect(master);
+    osc.start();
+    ambientNodes.push(osc, g);
+  }
+
+  if (config.noise) {
+    const noise = new Tone.Noise(config.noise.type);
+    const filter = new Tone.Filter(
+      config.noise.filterFreq,
+      config.noise.filterType || "lowpass",
+    );
+    filter.Q.value = config.noise.q ?? 1;
+    const g = new Tone.Gain(config.noise.gain);
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(master);
+    noise.start();
+    ambientNodes.push(noise, filter, g);
+
+    if (config.sweep) {
+      const base = config.noise.filterFreq;
+      const lfo = new Tone.LFO(
+        config.sweep.rate,
+        Math.max(20, base - config.sweep.depth),
+        base + config.sweep.depth,
+      );
+      lfo.connect(filter.frequency);
+      lfo.start();
+      ambientNodes.push(lfo);
+    }
+  }
+
+  // Smooth fade-in.
+  const now = Tone.now();
+  master.gain.setValueAtTime(0, now);
+  master.gain.linearRampToValueAtTime(config.masterGain, now + 1.5);
+}
+
+/** Fade out and dispose the ambient bed. */
+export function stopAmbientBed(): void {
+  if (!ambientMaster) return;
+  const m = ambientMaster;
+  const nodes = ambientNodes;
+  ambientMaster = null;
+  ambientNodes = [];
+  ambientCurrentConfig = null;
+  try {
+    const cur = m.gain.value;
+    m.gain.cancelScheduledValues(Tone.now());
+    m.gain.setValueAtTime(cur, Tone.now());
+    m.gain.linearRampToValueAtTime(0, Tone.now() + 0.4);
+  } catch { /* gone */ }
+  window.setTimeout(() => {
+    nodes.forEach((n) => { try { n.dispose(); } catch { /* gone */ } });
+    try { m.dispose(); } catch { /* gone */ }
+  }, 500);
+}
+
+/** Set the ambient bed's volume (0..1 multiplier on masterGain). */
+export function setAmbientVolume(multiplier: number): void {
+  if (!ambientMaster || !ambientCurrentConfig) return;
+  const target = Math.max(0, ambientCurrentConfig.masterGain * multiplier);
+  try {
+    ambientMaster.gain.linearRampToValueAtTime(target, Tone.now() + 0.2);
+  } catch { /* gone */ }
+}
 
 function readEnabled(): boolean {
   try {
@@ -84,6 +204,7 @@ export async function initAudio(): Promise<void> {
     synth.volume.value = STING_VOLUME_DB;
     state.synth = synth;
     state.initialized = true;
+    notifyInit();
   })();
 
   state.initializing = promise;
@@ -102,6 +223,16 @@ export function setEnabled(enabled: boolean): void {
 
 export function isEnabled(): boolean {
   return state.enabled;
+}
+
+export function isInitialized(): boolean {
+  return state.initialized;
+}
+
+/** Subscribe to one-shot audio-initialised notification. Returns unsub. */
+export function subscribeInit(cb: () => void): () => void {
+  initSubscribers.add(cb);
+  return () => { initSubscribers.delete(cb); };
 }
 
 /**
