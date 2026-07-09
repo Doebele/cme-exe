@@ -4,8 +4,9 @@ import ConsoleHeroCanvas from "../components/ConsoleHeroCanvas";
 import RotatingWireframeHeroCanvas from "../components/RotatingWireframeHeroCanvas";
 import ParticleTextHeroCanvas from "../components/ParticleTextHeroCanvas";
 import FlowFieldHeroCanvas from "../components/FlowFieldHeroCanvas";
+import OutrunHeroCanvas from "../components/OutrunHeroCanvas";
 
-type HeroAnimationId = "ascii-materialize" | "console-boot" | "rotating-wireframe" | "particle-text" | "flow-field";
+type HeroAnimationId = "ascii-materialize" | "console-boot" | "rotating-wireframe" | "particle-text" | "flow-field" | "outrun";
 
 const HERO_CACHE: { animation?: HeroAnimationId } = {};
 let heroPromise: Promise<HeroAnimationId> | null = null;
@@ -52,6 +53,7 @@ export default function BootSection() {
       {animation === "rotating-wireframe" && <RotatingWireframeHeroCanvas />}
       {animation === "particle-text" && <ParticleTextHeroCanvas />}
       {animation === "flow-field" && <FlowFieldHeroCanvas />}
+      {animation === "outrun" && <OutrunHeroCanvas />}
 
       {animation !== "console-boot" && (
         <div className="boot-hero-controls">

@@ -163,6 +163,7 @@ export default function BehaviorTab() {
             { value: "rotating-wireframe", label: "Rotating Wireframe — 3D ASCII torus (demoscene)" },
             { value: "particle-text", label: "Particle Text Morph — particles swarm and form words (p5.js)" },
             { value: "flow-field", label: "Flow Field — Perlin-noise particle streams (p5.js)" },
+            { value: "outrun", label: "Outrun Drive — synthwave grid + approaching 3D objects" },
           ]}
           onChange={(v) => setB("heroAnimation", v)}
           disabled={isSaving}

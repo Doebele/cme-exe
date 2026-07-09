@@ -3,13 +3,16 @@ import { useEffect, useRef } from "react";
 // ---------------------------------------------------------------------------
 // Particle Text Morph hero animation (p5.js).
 //
-// Hundreds of particles swarm randomly, then converge to form words/shapes.
-// They hold, then explode and reform into the next word. Loops forever.
-// Uses an offscreen canvas to sample text pixels into target points.
+// Particles swarm randomly, then converge to densely fill words/shapes.
+// They hold, then explode outward and reform into the next word. Loops.
+//
+// Tuned for legibility: heavy font weight + stroke for thick strokes, dense
+// pixel sampling, strong spring physics with high damping so particles snap
+// tightly to their targets, and minimal hold-phase jitter.
 // ---------------------------------------------------------------------------
 
 const MORPH_WORDS = ["CME.exe", "AI × DESIGN", "THE MACHINE"];
-const PARTICLE_COUNT = 700;
+const PARTICLE_COUNT = 1400;
 
 interface Particle {
   x: number;
@@ -19,7 +22,6 @@ interface Particle {
   tx: number;
   ty: number;
   size: number;
-  hue: number;
 }
 
 interface Colors {
@@ -38,7 +40,6 @@ function readColors(): Colors {
   };
 }
 
-/** Parse a hex colour to RGB tuple. */
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
@@ -60,7 +61,6 @@ export default function ParticleTextHeroCanvas() {
 
       const sketch = (p: any) => {
         let particles: Particle[] = [];
-        let targets: { x: number; y: number }[] = [];
         let wordIndex = 0;
         let morphTimer = 0;
         const MORPH_HOLD_MS = 3500;
@@ -103,13 +103,13 @@ export default function ParticleTextHeroCanvas() {
               vy: p.random(-2, 2),
               tx: canvasW / 2,
               ty: canvasH / 2,
-              size: p.random(1.5, 3.5),
-              hue: p.random(),
+              size: p.random(1.8, 3.2),
             });
           }
         }
 
-        /** Render text to offscreen canvas, sample dark pixels as targets. */
+        /** Render text to offscreen canvas (heavy + stroked for thickness),
+         *  sample opaque pixels densely as target points. */
         function setTargetsForWord(word: string) {
           offscreen.width = canvasW;
           offscreen.height = canvasH;
@@ -117,40 +117,50 @@ export default function ParticleTextHeroCanvas() {
           octx.fillStyle = "#000";
           octx.fillRect(0, 0, canvasW, canvasH);
 
-          // Scale font to fit width
-          const baseFontSize = Math.min(canvasW / (word.length * 0.65), canvasH * 0.45);
+          // Large font so the word fills the canvas.
+          const baseFontSize = Math.min(canvasW / (word.length * 0.62), canvasH * 0.5);
           octx.fillStyle = "#fff";
-          octx.font = `900 ${baseFontSize}px 'Fira Mono', 'Courier New', monospace`;
           octx.textAlign = "center";
           octx.textBaseline = "middle";
-          octx.fillText(word, canvasW / 2, canvasH / 2);
+          // Heavy weight + thick stroke so the text shape is chunky and
+          // produces many target pixels for dense particle coverage.
+          octx.font = `900 ${baseFontSize}px 'Fira Mono', 'Courier New', monospace`;
+          octx.lineJoin = "round";
+          const cx = canvasW / 2;
+          const cy = canvasH / 2;
+          // Stroke outline to thicken the glyph shape.
+          octx.lineWidth = Math.max(2, baseFontSize * 0.04);
+          octx.strokeStyle = "#fff";
+          octx.strokeText(word, cx, cy);
+          octx.fillText(word, cx, cy);
 
-          // Sample pixels
+          // Sample opaque pixels. Step scales with font size so sampling
+          // density stays proportional regardless of canvas dimensions.
+          const sampleStep = Math.max(3, Math.floor(baseFontSize / 38));
           const imgData = octx.getImageData(0, 0, canvasW, canvasH);
           const data = imgData.data;
-          const sampleStep = Math.max(3, Math.floor(Math.sqrt(
-            (canvasW * canvasH * 0.15) / PARTICLE_COUNT
-          )));
           const candidates: { x: number; y: number }[] = [];
           for (let y = 0; y < canvasH; y += sampleStep) {
             for (let x = 0; x < canvasW; x += sampleStep) {
-              const idx = (y * canvasW + x) * 4 + 3; // alpha channel
+              const idx = (y * canvasW + x) * 4;
+              // Red channel > threshold = opaque white pixel (text)
               if (data[idx]! > 128) {
                 candidates.push({ x, y });
               }
             }
           }
 
-          // Shuffle and assign
+          // Shuffle candidates so particles spread randomly across the word.
           for (let i = candidates.length - 1; i > 0; i--) {
             const j = Math.floor(p.random(i + 1));
             [candidates[i], candidates[j]] = [candidates[j]!, candidates[i]!];
           }
 
-          targets = candidates;
-          // Assign each particle a target (cycling if fewer targets)
+          // Assign each particle a target. If more particles than targets,
+          // cycle so extras cluster on existing points. If fewer, some text
+          // pixels go uncovered (acceptable — particles are dense enough).
           for (let i = 0; i < particles.length; i++) {
-            const t = targets[i % Math.max(1, targets.length)];
+            const t = candidates[i % Math.max(1, candidates.length)];
             if (t) {
               particles[i]!.tx = t.x;
               particles[i]!.ty = t.y;
@@ -159,16 +169,16 @@ export default function ParticleTextHeroCanvas() {
         }
 
         p.draw = () => {
-          // Trail effect: semi-transparent background
+          // Trail effect: semi-transparent background each frame.
           const bgRgb = hexToRgb(colors.bg);
           p.noStroke();
-          p.fill(bgRgb[0], bgRgb[1], bgRgb[2], 40);
+          p.fill(bgRgb[0], bgRgb[1], bgRgb[2], 38);
           p.rect(0, 0, canvasW, canvasH);
 
           const now = p.millis();
           // Phase machine
           if (phase === "forming") {
-            if (now - morphTimer > 1500) {
+            if (now - morphTimer > 1600) {
               phase = "holding";
               morphTimer = now;
             }
@@ -176,10 +186,9 @@ export default function ParticleTextHeroCanvas() {
             if (now - morphTimer > MORPH_HOLD_MS) {
               phase = "exploding";
               morphTimer = now;
-              // Give all particles outward velocity
               for (const part of particles) {
                 const ang = p.random(p.TWO_PI);
-                const spd = p.random(3, 8);
+                const spd = p.random(4, 10);
                 part.vx = Math.cos(ang) * spd;
                 part.vy = Math.sin(ang) * spd;
               }
@@ -193,24 +202,21 @@ export default function ParticleTextHeroCanvas() {
             }
           }
 
-          // Update + draw particles
           for (const part of particles) {
             if (phase !== "exploding") {
-              // Spring toward target
               const dx = part.tx - part.x;
               const dy = part.ty - part.y;
-              part.vx += dx * 0.04;
-              part.vy += dy * 0.04;
-              // Damping
-              part.vx *= 0.85;
-              part.vy *= 0.85;
-              // Tiny noise jitter for life
+              // Strong spring + high damping → particles snap tightly.
+              part.vx += dx * 0.09;
+              part.vy += dy * 0.09;
+              part.vx *= 0.80;
+              part.vy *= 0.80;
+              // Subtle jitter only during hold, kept tiny so the word stays crisp.
               if (phase === "holding") {
-                part.vx += p.random(-0.15, 0.15);
-                part.vy += p.random(-0.15, 0.15);
+                part.vx += p.random(-0.06, 0.06);
+                part.vy += p.random(-0.06, 0.06);
               }
             } else {
-              // Explosion: just coast with friction
               part.vx *= 0.96;
               part.vy *= 0.96;
             }
@@ -218,29 +224,27 @@ export default function ParticleTextHeroCanvas() {
             part.x += part.vx;
             part.y += part.vy;
 
-            // Colour blend: primary when near target, accent when far
+            // Colour blend: primary when near target, accent when drifting.
             const dist = Math.hypot(part.tx - part.x, part.ty - part.y);
-            const closeness = Math.max(0, 1 - dist / 150);
+            const closeness = Math.max(0, 1 - dist / 120);
             const r = p.lerp(accentRgb[0], primaryRgb[0], closeness);
             const g = p.lerp(accentRgb[1], primaryRgb[1], closeness);
             const b = p.lerp(accentRgb[2], primaryRgb[2], closeness);
 
-            // Glow when close to target
-            if (closeness > 0.6) {
-              p.drawingContext.shadowBlur = 8;
+            if (closeness > 0.55) {
+              p.drawingContext.shadowBlur = 7;
               p.drawingContext.shadowColor = colors.primary;
             } else {
               p.drawingContext.shadowBlur = 0;
             }
 
             p.noStroke();
-            p.fill(r, g, b, 220);
+            p.fill(r, g, b, 230);
             p.circle(part.x, part.y, part.size);
           }
           p.drawingContext.shadowBlur = 0;
         };
 
-        // Theme observer
         const themeObs = new MutationObserver(() => {
           colors = readColors();
           primaryRgb = hexToRgb(colors.primary);

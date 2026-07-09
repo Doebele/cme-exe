@@ -38,7 +38,8 @@ export type HeroAnimationId =
   | "console-boot"
   | "rotating-wireframe"
   | "particle-text"
-  | "flow-field";
+  | "flow-field"
+  | "outrun";
 
 export interface BehaviorBlock {
   bootMode: BootMode;
