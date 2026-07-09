@@ -33,12 +33,19 @@ const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
+// Trust the reverse proxy (Nginx) so req.protocol reflects the original
+// scheme (https) rather than the internal plain-HTTP hop.
+app.set("trust proxy", 1);
+
 app.use(
   session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === "production", maxAge: 24 * 60 * 60 * 1000 },
+    // auto: the cookie is marked Secure only when the connection is HTTPS.
+    // This fixes sessions on localhost HTTP (NODE_ENV=production but no TLS)
+    // while still securing cookies on the live HTTPS deployment.
+    cookie: { secure: "auto", maxAge: 24 * 60 * 60 * 1000 },
   })
 );
 
