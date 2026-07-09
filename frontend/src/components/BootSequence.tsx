@@ -104,7 +104,8 @@ function prefersReducedMotion(): boolean {
 
 export default function BootSequence({ onDone }: BootSequenceProps) {
   const reduced = useMemo(prefersReducedMotion, []);
-  const [phase, setPhase] = useState<1 | 2 | 3 | 4>(reduced ? 2 : 1);
+  // Phase 0 = "click to enter" gate (user gesture for Tone.start).
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4>(reduced ? 2 : 0);
   const [biosVisibleLines, setBiosVisibleLines] = useState<number>(
     reduced ? BIOS_LINES_BASE.length : 0,
   );
@@ -139,10 +140,27 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
     };
   }, []);
 
-  // Fire the CRT boot sound at phase 1.
+  // Fire the CRT boot sound at phase 1 (after enter gate).
   useEffect(() => {
     if (phase === 1 && !reduced) playBootSound();
   }, [phase, reduced]);
+
+  // Enter gate: listen for click / keypress, init audio, then start boot.
+  useEffect(() => {
+    if (phase !== 0) return;
+    const enter = () => {
+      initAudio().catch(() => { /* ignore */ });
+      setPhase(1);
+    };
+    const onKey = (e: KeyboardEvent) => { e.preventDefault(); enter(); };
+    const onClick = (e: MouseEvent) => { e.preventDefault(); enter(); };
+    window.addEventListener("keydown", onKey, { once: true });
+    window.addEventListener("pointerdown", onClick, { once: true, capture: true });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onClick, { capture: true } as AddEventListenerOptions);
+    };
+  }, [phase]);
 
   // Phase sequencing.
   useEffect(() => {
@@ -193,14 +211,14 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
     return () => window.clearTimeout(t);
   }, [phase, reduced, onDone]);
 
-  // Skip: any of these drops us straight to phase 4.
+  // Skip (phases 1-3): click or key drops to fade-out.
   useEffect(() => {
+    if (phase === 0) return; // phase 0 has its own enter handler
     const skip = () => {
       setBiosVisibleLines(BIOS_LINES_BASE.length);
       setPhase(4);
     };
     const onKey = (e: KeyboardEvent) => {
-      // Don't trap the key — just listen.
       e.preventDefault();
       skip();
     };
@@ -214,7 +232,7 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointer, { capture: true } as AddEventListenerOptions);
     };
-  }, []);
+  }, [phase]);
 
   // Persist the booted flag on completion (caller decides bootMode; this flag
   // gates first-visit replay only).
@@ -229,14 +247,16 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
   }, [phase]);
 
   const overlayClass =
-    phase === 4
-      ? "boot-overlay boot-overlay--fadeout"
-      : phase === 1
-        ? "boot-overlay boot-overlay--flash"
-        : "boot-overlay";
+    phase === 0
+      ? "boot-overlay boot-overlay--enter"
+      : phase === 4
+        ? "boot-overlay boot-overlay--fadeout"
+        : phase === 1
+          ? "boot-overlay boot-overlay--flash"
+          : "boot-overlay";
 
   return (
-    <div className={overlayClass} role="alertdialog" aria-label="Booting CME.exe">
+    <div className={overlayClass} role="alertdialog" aria-label={phase === 0 ? "Press to enter CME.exe" : "Booting CME.exe"}>
       {/* CRT bezel / scanlines / vignette are part of the overlay so the
           boot reads as a self-contained CRT regardless of theme layering. */}
       <div className="boot-crt" aria-hidden>
@@ -244,6 +264,21 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
         <div className="boot-crt__vignette" />
         {phase === 1 && !reduced && <div className="boot-flash" />}
       </div>
+
+      {/* Phase 0: Click-to-enter gate. Guarantees a user gesture for
+          Tone.start() so the 56k modem sound plays on first visit. */}
+      {phase === 0 && (
+        <div className="boot-enter">
+          <p className="boot-enter__brand font-display crt-glow">CME.exe</p>
+          <p className="boot-enter__tagline font-display">
+            A Medvesek Experiment in AI × Design
+          </p>
+          <p className="boot-enter__prompt font-display">
+            Press any key or click to boot
+            <span className="boot-enter__caret" aria-hidden>█</span>
+          </p>
+        </div>
+      )}
 
       <div className="boot-content">
         {/* BIOS text — phases 2/3/4. Under reduced-motion we render all lines
@@ -261,16 +296,18 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
         {reduced && phase >= 2 && <BootLogoStatic />}
       </div>
 
-      <button
-        type="button"
-        className="boot-skip"
-        onClick={() => {
-          setBiosVisibleLines(BIOS_LINES_BASE.length);
-          setPhase(4);
-        }}
-      >
-        SKIP ▶
-      </button>
+      {phase > 0 && (
+        <button
+          type="button"
+          className="boot-skip"
+          onClick={() => {
+            setBiosVisibleLines(BIOS_LINES_BASE.length);
+            setPhase(4);
+          }}
+        >
+          SKIP ▶
+        </button>
+      )}
     </div>
   );
 }
