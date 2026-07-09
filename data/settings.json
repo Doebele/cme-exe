@@ -65,9 +65,9 @@
     "mobileTiktokVariant": true,
     "hybridRateLimitPerHour": 20,
     "gameVariant": "invaders",
+    "heroAnimation": "ascii-materialize",
     "speedrunDurationSec": 60,
-    "mobileVariant": true,
-    "heroAnimation": "ascii-materialize"
+    "mobileVariant": true
   },
   "experience": {
     "allowFullMode": true,

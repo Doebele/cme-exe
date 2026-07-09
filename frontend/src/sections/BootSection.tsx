@@ -49,21 +49,23 @@ export default function BootSection() {
       {animation === "console-boot" && <ConsoleHeroCanvas />}
       {animation === "rotating-wireframe" && <RotatingWireframeHeroCanvas />}
 
-      <div className="boot-hero-controls">
-        <button
-          type="button"
-          onClick={replay}
-          className="font-display text-xs uppercase tracking-[0.2em] px-5 py-2.5 border boot-hero-btn"
-        >
-          ▶ Replay boot sequence
-        </button>
-        <a
-          href="#observer"
-          className="font-display text-xs uppercase tracking-[0.2em] px-5 py-2.5 border boot-hero-btn boot-hero-btn--muted"
-        >
-          Skip to speedrun →
-        </a>
-      </div>
+      {animation !== "console-boot" && (
+        <div className="boot-hero-controls">
+          <button
+            type="button"
+            onClick={replay}
+            className="font-display text-xs uppercase tracking-[0.2em] px-5 py-2.5 border boot-hero-btn"
+          >
+            ▶ Replay boot sequence
+          </button>
+          <a
+            href="#observer"
+            className="font-display text-xs uppercase tracking-[0.2em] px-5 py-2.5 border boot-hero-btn boot-hero-btn--muted"
+          >
+            Skip to speedrun →
+          </a>
+        </div>
+      )}
     </section>
   );
 }
