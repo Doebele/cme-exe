@@ -33,6 +33,11 @@ export interface AudioBlock {
 
 export type GameVariant = "asteroids" | "invaders";
 
+export type HeroAnimationId =
+  | "ascii-materialize"
+  | "console-boot"
+  | "rotating-wireframe";
+
 export interface BehaviorBlock {
   bootMode: BootMode;
   speedrunDurationSeconds: number;
@@ -40,6 +45,7 @@ export interface BehaviorBlock {
   mobileTiktokVariant: boolean;
   hybridRateLimitPerHour: number;
   gameVariant: GameVariant;
+  heroAnimation: HeroAnimationId;
 }
 
 export interface ExperienceBlock {

@@ -66,7 +66,8 @@
     "hybridRateLimitPerHour": 20,
     "gameVariant": "invaders",
     "speedrunDurationSec": 60,
-    "mobileVariant": true
+    "mobileVariant": true,
+    "heroAnimation": "ascii-materialize"
   },
   "experience": {
     "allowFullMode": true,

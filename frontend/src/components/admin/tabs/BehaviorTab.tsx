@@ -5,6 +5,7 @@ import type {
   ExperienceBlock,
   BootMode,
   GameVariant,
+  HeroAnimationId,
 } from "../AdminShared";
 import {
   AdminCard,
@@ -24,6 +25,7 @@ const DEFAULT_BEHAVIOR: BehaviorBlock = {
   mobileTiktokVariant: true,
   hybridRateLimitPerHour: 20,
   gameVariant: "asteroids",
+  heroAnimation: "ascii-materialize",
 };
 
 const DEFAULT_EXPERIENCE: ExperienceBlock = {
@@ -148,6 +150,24 @@ export default function BehaviorTab() {
           Switches the play style in the Quest section. Asteroids keeps the
           free-roaming original; Invaders is a marching-formation homage with
           barriers, bombs, and the same design-quote drops.
+        </p>
+      </AdminCard>
+
+      <AdminCard title="Hero animation">
+        <RadioGroup<HeroAnimationId>
+          label="Hero animation"
+          value={behavior.heroAnimation}
+          options={[
+            { value: "ascii-materialize", label: "ASCII Materialize — CME.exe forms from random chars" },
+            { value: "console-boot", label: "Console Boot — terminal types out system diagnostics" },
+            { value: "rotating-wireframe", label: "Rotating Wireframe — 3D ASCII torus (demoscene)" },
+          ]}
+          onChange={(v) => setB("heroAnimation", v)}
+          disabled={isSaving}
+        />
+        <p className="admin-field-row__hint font-display">
+          The animated hero shown in the Boot section. All three are pure-canvas,
+          theme-aware, and respect prefers-reduced-motion.
         </p>
       </AdminCard>
 
