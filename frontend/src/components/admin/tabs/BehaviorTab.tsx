@@ -161,6 +161,8 @@ export default function BehaviorTab() {
             { value: "ascii-materialize", label: "ASCII Materialize — CME.exe forms from random chars" },
             { value: "console-boot", label: "Console Boot — terminal types out system diagnostics" },
             { value: "rotating-wireframe", label: "Rotating Wireframe — 3D ASCII torus (demoscene)" },
+            { value: "particle-text", label: "Particle Text Morph — particles swarm and form words (p5.js)" },
+            { value: "flow-field", label: "Flow Field — Perlin-noise particle streams (p5.js)" },
           ]}
           onChange={(v) => setB("heroAnimation", v)}
           disabled={isSaving}

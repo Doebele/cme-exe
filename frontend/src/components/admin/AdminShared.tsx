@@ -36,7 +36,9 @@ export type GameVariant = "asteroids" | "invaders";
 export type HeroAnimationId =
   | "ascii-materialize"
   | "console-boot"
-  | "rotating-wireframe";
+  | "rotating-wireframe"
+  | "particle-text"
+  | "flow-field";
 
 export interface BehaviorBlock {
   bootMode: BootMode;
