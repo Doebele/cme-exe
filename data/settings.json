@@ -65,9 +65,20 @@
     "mobileTiktokVariant": true,
     "hybridRateLimitPerHour": 20,
     "gameVariant": "invaders",
-    "heroAnimation": "ascii-materialize",
+    "heroAnimation": "outrun",
     "speedrunDurationSec": 60,
-    "mobileVariant": true
+    "mobileVariant": true,
+    "heroAnimationPool": [
+      "ascii-materialize",
+      "console-boot",
+      "rotating-wireframe",
+      "particle-text",
+      "flow-field",
+      "outrun",
+      "glitch-storm",
+      "hyperspace",
+      "game-of-life"
+    ]
   },
   "experience": {
     "allowFullMode": true,

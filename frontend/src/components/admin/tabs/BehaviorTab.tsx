@@ -26,12 +26,29 @@ const DEFAULT_BEHAVIOR: BehaviorBlock = {
   hybridRateLimitPerHour: 20,
   gameVariant: "asteroids",
   heroAnimation: "ascii-materialize",
+  heroAnimationPool: [
+    "ascii-materialize", "console-boot", "rotating-wireframe",
+    "particle-text", "flow-field", "outrun",
+    "glitch-storm", "hyperspace", "game-of-life",
+  ],
 };
 
 const DEFAULT_EXPERIENCE: ExperienceBlock = {
   allowFullMode: true,
   allowedProviders: [...PROVIDER_ORDER],
 };
+
+const HERO_OPTIONS: { value: HeroAnimationId; label: string }[] = [
+  { value: "ascii-materialize", label: "ASCII Materialize" },
+  { value: "console-boot", label: "Console Boot (menu)" },
+  { value: "rotating-wireframe", label: "Rotating Wireframe C" },
+  { value: "particle-text", label: "Particle Text Morph" },
+  { value: "flow-field", label: "Flow Field (interactive)" },
+  { value: "outrun", label: "Outrun Drive" },
+  { value: "glitch-storm", label: "Glitch Storm" },
+  { value: "hyperspace", label: "Hyperspace Tunnel" },
+  { value: "game-of-life", label: "Game of Life × ASCII" },
+];
 
 const ALL_PROVIDERS: AiProvider[] = PROVIDER_ORDER;
 
@@ -153,25 +170,36 @@ export default function BehaviorTab() {
         </p>
       </AdminCard>
 
-      <AdminCard title="Hero animation">
-        <RadioGroup<HeroAnimationId>
-          label="Hero animation"
-          value={behavior.heroAnimation}
-          options={[
-            { value: "ascii-materialize", label: "ASCII Materialize — CME.exe forms from random chars" },
-            { value: "console-boot", label: "Console Boot — terminal types out system diagnostics" },
-            { value: "rotating-wireframe", label: "Rotating Wireframe — 3D ASCII torus (demoscene)" },
-            { value: "particle-text", label: "Particle Text Morph — particles swarm and form words (p5.js)" },
-            { value: "flow-field", label: "Flow Field — Perlin-noise particle streams (p5.js)" },
-            { value: "outrun", label: "Outrun Drive — synthwave grid + approaching 3D objects" },
-          ]}
-          onChange={(v) => setB("heroAnimation", v)}
-          disabled={isSaving}
-        />
-        <p className="admin-field-row__hint font-display">
-          The animated hero shown in the Boot section. All three are pure-canvas,
-          theme-aware, and respect prefers-reduced-motion.
+      <AdminCard title="Hero animation pool">
+        <p className="admin-field-row__hint font-display" style={{ marginBottom: "0.75rem" }}>
+          A random animation from the enabled pool is shown on each page reload.
+          Press keys 1–9 on the live site to force a specific animation (Easter egg).
         </p>
+        <div className="admin-check-row admin-check-row--multi">
+          {HERO_OPTIONS.map((opt, idx) => {
+            const checked = behavior.heroAnimationPool.includes(opt.value);
+            return (
+              <div key={opt.value} className="admin-hero-check">
+                <CheckboxField
+                  label={`${idx + 1}  ${opt.label}`}
+                  checked={checked}
+                  onChange={(v) => {
+                    setBehavior((cur) => {
+                      if (!cur) return cur;
+                      const set = new Set(cur.heroAnimationPool);
+                      if (v) set.add(opt.value);
+                      else set.delete(opt.value);
+                      // Always keep at least one enabled
+                      const pool = HERO_OPTIONS.map((o) => o.value).filter((o) => set.has(o));
+                      return { ...cur, heroAnimationPool: pool.length ? pool : cur.heroAnimationPool };
+                    });
+                  }}
+                  disabled={isSaving}
+                />
+              </div>
+            );
+          })}
+        </div>
       </AdminCard>
 
       <AdminCard title="AI modes">

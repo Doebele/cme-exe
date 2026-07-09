@@ -5,45 +5,82 @@ import RotatingWireframeHeroCanvas from "../components/RotatingWireframeHeroCanv
 import ParticleTextHeroCanvas from "../components/ParticleTextHeroCanvas";
 import FlowFieldHeroCanvas from "../components/FlowFieldHeroCanvas";
 import OutrunHeroCanvas from "../components/OutrunHeroCanvas";
+import GlitchHeroCanvas from "../components/GlitchHeroCanvas";
+import HyperspaceHeroCanvas from "../components/HyperspaceHeroCanvas";
+import GameOfLifeHeroCanvas from "../components/GameOfLifeHeroCanvas";
 
-type HeroAnimationId = "ascii-materialize" | "console-boot" | "rotating-wireframe" | "particle-text" | "flow-field" | "outrun";
+type HeroAnimationId =
+  | "ascii-materialize" | "console-boot" | "rotating-wireframe"
+  | "particle-text" | "flow-field" | "outrun"
+  | "glitch-storm" | "hyperspace" | "game-of-life";
 
-const HERO_CACHE: { animation?: HeroAnimationId } = {};
-let heroPromise: Promise<HeroAnimationId> | null = null;
+// Order here defines the 1–9 keyboard shortcut mapping.
+const HERO_ORDER: HeroAnimationId[] = [
+  "ascii-materialize", "console-boot", "rotating-wireframe",
+  "particle-text", "flow-field", "outrun",
+  "glitch-storm", "hyperspace", "game-of-life",
+];
 
-function fetchHeroAnimation(): Promise<HeroAnimationId> {
-  if (HERO_CACHE.animation) return Promise.resolve(HERO_CACHE.animation);
-  if (heroPromise) return heroPromise;
-  heroPromise = fetch("/api/content/settings")
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d: { behavior?: { heroAnimation?: HeroAnimationId } } | null) => {
-      const id = d?.behavior?.heroAnimation ?? "ascii-materialize";
-      HERO_CACHE.animation = id;
-      return id;
-    })
-    .catch(() => {
-      HERO_CACHE.animation = "ascii-materialize";
-      return HERO_CACHE.animation;
-    });
-  return heroPromise;
+const HERO_LABELS: Record<HeroAnimationId, string> = {
+  "ascii-materialize": "ASCII MATERIALIZE",
+  "console-boot": "CONSOLE BOOT",
+  "rotating-wireframe": "ROTATING WIREFRAME C",
+  "particle-text": "PARTICLE TEXT MORPH",
+  "flow-field": "FLOW FIELD",
+  "outrun": "OUTRUN DRIVE",
+  "glitch-storm": "GLITCH STORM",
+  "hyperspace": "HYPERSPACE TUNNEL",
+  "game-of-life": "GAME OF LIFE",
+};
+
+interface PoolResponse {
+  behavior?: { heroAnimationPool?: HeroAnimationId[] };
 }
 
 export default function BootSection() {
   const [animation, setAnimation] = useState<HeroAnimationId>("ascii-materialize");
-  const replay = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("cme-exe:replay-boot"));
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Pick a random animation from the pool on mount.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/content/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: PoolResponse | null) => {
+        if (!active) return;
+        const pool = d?.behavior?.heroAnimationPool?.length
+          ? d.behavior.heroAnimationPool
+          : HERO_ORDER;
+        const pick = pool[Math.floor(Math.random() * pool.length)] ?? "ascii-materialize";
+        setAnimation(pick as HeroAnimationId);
+      })
+      .catch(() => { /* keep default */ });
+    return () => { active = false; };
   }, []);
 
+  // Keyboard shortcuts 1–9 (Easter egg): force a specific animation.
   useEffect(() => {
-    fetchHeroAnimation().then(setAnimation);
-    // Re-read when admin saves settings (custom event from admin, or visibility change).
-    const onChange = () => {
-      HERO_CACHE.animation = undefined;
-      heroPromise = null;
-      fetchHeroAnimation().then(setAnimation);
+    const flashToast = (id: HeroAnimationId) => {
+      setToast(HERO_LABELS[id]);
+      window.setTimeout(() => setToast((t) => (t === HERO_LABELS[id] ? null : t)), 1600);
     };
-    window.addEventListener("cme-exe:settings-updated", onChange);
-    return () => window.removeEventListener("cme-exe:settings-updated", onChange);
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when typing into an input/textarea
+      const el = document.activeElement;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9 && HERO_ORDER[n - 1]) {
+        const id = HERO_ORDER[n - 1]!;
+        setAnimation(id);
+        flashToast(id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const replay = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("cme-exe:replay-boot"));
   }, []);
 
   return (
@@ -54,6 +91,9 @@ export default function BootSection() {
       {animation === "particle-text" && <ParticleTextHeroCanvas />}
       {animation === "flow-field" && <FlowFieldHeroCanvas />}
       {animation === "outrun" && <OutrunHeroCanvas />}
+      {animation === "glitch-storm" && <GlitchHeroCanvas />}
+      {animation === "hyperspace" && <HyperspaceHeroCanvas />}
+      {animation === "game-of-life" && <GameOfLifeHeroCanvas />}
 
       {animation !== "console-boot" && (
         <div className="boot-hero-controls">
@@ -70,6 +110,12 @@ export default function BootSection() {
           >
             Skip to speedrun →
           </a>
+        </div>
+      )}
+
+      {toast && (
+        <div className="boot-hero-toast font-display" role="status" aria-live="polite">
+          ▶ {toast}
         </div>
       )}
     </section>

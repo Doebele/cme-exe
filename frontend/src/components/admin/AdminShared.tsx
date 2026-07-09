@@ -39,7 +39,10 @@ export type HeroAnimationId =
   | "rotating-wireframe"
   | "particle-text"
   | "flow-field"
-  | "outrun";
+  | "outrun"
+  | "glitch-storm"
+  | "hyperspace"
+  | "game-of-life";
 
 export interface BehaviorBlock {
   bootMode: BootMode;
@@ -49,6 +52,7 @@ export interface BehaviorBlock {
   hybridRateLimitPerHour: number;
   gameVariant: GameVariant;
   heroAnimation: HeroAnimationId;
+  heroAnimationPool: HeroAnimationId[];
 }
 
 export interface ExperienceBlock {
