@@ -29,6 +29,12 @@ const IMAGE_FETCH_TIMEOUT_MS = 8_000;
 const IMAGE_MAX_BYTES = 500_000;
 const ASCII_PER_IMAGE_TIMEOUT_MS = 4_000; // practical: network fetch + decode needs > 500ms
 const ASCII_RAMP = " .:-=+*#%@";
+// Output is downscaled to ASCII_MAX_DIM x ASCII_MAX_DIM, so a decoded image
+// never needs more than a few megapixels. Without this cap, a tiny file can
+// declare a huge width/height and force a multi-gigabyte decode allocation
+// (security finding: PNG dimension bomb) before any real pixel data is read.
+const MAX_IMAGE_PIXELS = 4_000_000; // ~4 MP
+const EXTRACTION_TIME_BUDGET_MS = 200; // wall-clock budget for HTML-extraction passes
 
 const CACHE_TTL_MS = 60 * 60 * 1_000; // 60 min
 const FETCH_RATE_LIMIT = 10; // per IP per hour
@@ -400,18 +406,123 @@ function safeFromCodePoint(code) {
 }
 
 /**
+ * All (non-overlapping) indices of a literal substring, in order.
+ * @param {string} haystack
+ * @param {string} needle
+ * @returns {number[]}
+ */
+function allIndices(haystack, needle) {
+  const out = [];
+  for (let idx = haystack.indexOf(needle); idx !== -1; idx = haystack.indexOf(needle, idx + needle.length)) {
+    out.push(idx);
+  }
+  return out;
+}
+
+/**
+ * Remove every `open...close` literal-delimited span from `html` (used for
+ * HTML comments). Finds all open/close delimiter positions in two single
+ * forward passes, then pairs them with a monotonic two-pointer walk — O(n)
+ * total even when `open` appears many times with no matching `close`
+ * anywhere, unlike a backtracking `open[\s\S]*?close` regex (which is
+ * O(n^2) in exactly that adversarial case — see the DoS security finding
+ * this function was rewritten to fix).
+ * @param {string} html
+ * @param {string} open
+ * @param {string} close
+ * @returns {string}
+ */
+function stripLiteralPairs(html, open, close) {
+  const opens = allIndices(html, open);
+  if (opens.length === 0) return html;
+  const closes = allIndices(html, close);
+  let result = "";
+  let cursor = 0;
+  let closePtr = 0;
+  for (const openIdx of opens) {
+    if (openIdx < cursor) continue; // inside a span we already removed
+    while (closePtr < closes.length && closes[closePtr] < openIdx + open.length) closePtr++;
+    if (closePtr >= closes.length) break; // no close left for this or any later open
+    result += html.slice(cursor, openIdx);
+    cursor = closes[closePtr] + close.length;
+    closePtr++;
+  }
+  result += html.slice(cursor);
+  return result;
+}
+
+/**
+ * Call `onMatch(attrs, inner, outerEnd)` for each `<tag ...>...</tag>` pair
+ * in document order, in O(n) total time regardless of how many `<tag>`s are
+ * unclosed (unlike a backtracking `<tag\b[^>]*>([\s\S]*?)<\/tag>` regex,
+ * which degrades to O(n^2) on adversarial input with many unclosed tags —
+ * see the DoS security finding this function was written to fix). Stops
+ * early if `onMatch` returns true, or once EXTRACTION_TIME_BUDGET_MS is
+ * exceeded (defense in depth against any pathological case this doesn't
+ * already handle).
+ * @param {string} html
+ * @param {string} tag
+ * @param {(attrs: string, inner: string, outerEnd: number) => boolean | void} onMatch
+ */
+function forEachTagPair(html, tag, onMatch) {
+  const openRe = new RegExp(`<${tag}\\b([^>]*)>`, "gi");
+  const lowerHtml = html.toLowerCase();
+  const closePositions = allIndices(lowerHtml, `</${tag.toLowerCase()}`);
+  const deadline = Date.now() + EXTRACTION_TIME_BUDGET_MS;
+  let closePtr = 0;
+  let m;
+  while ((m = openRe.exec(html)) !== null) {
+    if (Date.now() > deadline) break;
+    const innerStart = m.index + m[0].length;
+    while (closePtr < closePositions.length && closePositions[closePtr] < innerStart) closePtr++;
+    if (closePtr >= closePositions.length) break;
+    const closeStart = closePositions[closePtr];
+    const gt = html.indexOf(">", closeStart);
+    const outerEnd = gt === -1 ? html.length : gt + 1;
+    closePtr++;
+    const stop = onMatch(m[1] || "", html.slice(innerStart, closeStart), outerEnd);
+    openRe.lastIndex = outerEnd;
+    if (stop) break;
+  }
+}
+
+/**
  * Strip tags we never want content from: script, style, nav, footer, svg,
  * noscript, template, and HTML comments. Operates on a copy.
  * @param {string} html
  * @returns {string}
  */
 function stripNoise(html) {
-  let out = html;
-  out = out.replace(/<!--[\s\S]*?-->/g, "");
-  out = out.replace(
-    /<(script|style|nav|footer|svg|noscript|template|head|iframe|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
-    " "
-  );
+  let out = stripLiteralPairs(html, "<!--", "-->");
+  for (const tag of ["script", "style", "nav", "footer", "svg", "noscript", "template", "head", "iframe", "form"]) {
+    const ranges = [];
+    const openRe = new RegExp(`<${tag}\\b[^>]*>`, "gi");
+    const lowerOut = out.toLowerCase();
+    const closePositions = allIndices(lowerOut, `</${tag}`);
+    let closePtr = 0;
+    let m;
+    while ((m = openRe.exec(out)) !== null) {
+      const innerStart = m.index + m[0].length;
+      while (closePtr < closePositions.length && closePositions[closePtr] < innerStart) closePtr++;
+      if (closePtr >= closePositions.length) break;
+      const closeStart = closePositions[closePtr];
+      const gt = out.indexOf(">", closeStart);
+      const outerEnd = gt === -1 ? out.length : gt + 1;
+      ranges.push({ start: m.index, end: outerEnd });
+      closePtr++;
+      openRe.lastIndex = outerEnd;
+    }
+    if (ranges.length > 0) {
+      let result = "";
+      let cursor = 0;
+      for (const r of ranges) {
+        result += out.slice(cursor, r.start) + " ";
+        cursor = r.end;
+      }
+      result += out.slice(cursor);
+      out = result;
+    }
+  }
   return out;
 }
 
@@ -423,13 +534,12 @@ function stripNoise(html) {
  * @returns {string[]}
  */
 function extractTagTexts(html, tag, max) {
-  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}\\s*>`, "gi");
   const out = [];
-  let m;
-  while ((m = re.exec(html)) !== null && out.length < max) {
-    const text = decodeEntities(m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+  forEachTagPair(html, tag, (_attrs, inner) => {
+    const text = decodeEntities(inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
     if (text) out.push(text);
-  }
+    return out.length >= max;
+  });
   return out;
 }
 
@@ -441,24 +551,21 @@ function extractTagTexts(html, tag, max) {
  * @returns {Array<{ title: string, href: string }>}
  */
 function extractLinks(html, max) {
-  const re = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
   const out = [];
-  let m;
-  while ((m = re.exec(html)) !== null && out.length < max) {
-    const attrs = m[1] || "";
-    const inner = m[2] || "";
+  forEachTagPair(html, "a", (attrs, inner) => {
     const hrefMatch = attrs.match(/\bhref\s*=\s*"([^"]*)"/i) || attrs.match(/\bhref\s*=\s*'([^']*)'/i);
-    if (!hrefMatch) continue;
+    if (!hrefMatch) return false;
     let href = decodeEntities(hrefMatch[1].trim());
     if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") ||
-        href.startsWith("javascript:") || href.startsWith("data:")) continue;
-    if (!/^(https?:\/\/|\/|\.\/|\.\.\/)/.test(href)) continue; // skip protocol-relative too
+        href.startsWith("javascript:") || href.startsWith("data:")) return false;
+    if (!/^(https?:\/\/|\/|\.\/|\.\.\/)/.test(href)) return false; // skip protocol-relative too
     const title = decodeEntities(inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
-    if (!title) continue;
+    if (!title) return false;
     // Skip pure image anchors (no meaningful text).
-    if (/^[\s]*$/.test(title)) continue;
+    if (/^[\s]*$/.test(title)) return false;
     out.push({ title, href });
-  }
+    return out.length >= max;
+  });
   return out;
 }
 
@@ -520,11 +627,25 @@ function classifyImageKind(alt, className) {
  * @returns {Array<{start:number, end:number}>}
  */
 function findBlockRanges(html, blockClass) {
+  // Same two-pointer linear scan as forEachTagPair, but with a class-filtered
+  // open-tag pattern that helper doesn't support — see forEachTagPair's doc
+  // comment for why this avoids the backtracking-regex DoS.
   const ranges = [];
-  const re = new RegExp(`<table\\b[^>]*class\\s*=\\s*"[^"]*\\b${blockClass}\\b[^"]*"[^>]*>([\\s\\S]*?)<\\/table>`, "gi");
+  const openRe = new RegExp(`<table\\b[^>]*class\\s*=\\s*"[^"]*\\b${blockClass}\\b[^"]*"[^>]*>`, "gi");
+  const lowerHtml = html.toLowerCase();
+  const closePositions = allIndices(lowerHtml, "</table");
+  let closePtr = 0;
   let m;
-  while ((m = re.exec(html)) !== null) {
-    ranges.push({ start: m.index, end: m.index + m[0].length });
+  while ((m = openRe.exec(html)) !== null) {
+    const innerStart = m.index + m[0].length;
+    while (closePtr < closePositions.length && closePositions[closePtr] < innerStart) closePtr++;
+    if (closePtr >= closePositions.length) break;
+    const closeStart = closePositions[closePtr];
+    const gt = html.indexOf(">", closeStart);
+    const outerEnd = gt === -1 ? html.length : gt + 1;
+    ranges.push({ start: m.index, end: outerEnd });
+    closePtr++;
+    openRe.lastIndex = outerEnd;
   }
   return ranges;
 }
@@ -767,18 +888,40 @@ function detectFormat(contentType, buf) {
 }
 
 /**
+ * Read a PNG's declared width/height straight out of its IHDR chunk, without
+ * decoding any pixel data. PNG layout: 8-byte signature, then a 4-byte chunk
+ * length, 4-byte "IHDR", then width/height as big-endian uint32 — i.e. at
+ * fixed offsets 16 and 20 for any valid PNG.
+ * @param {Buffer} buf
+ * @returns {{ width: number, height: number } | null}
+ */
+function readPngDimensions(buf) {
+  if (buf.length < 24 || buf.toString("ascii", 12, 16) !== "IHDR") return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+/**
  * Decode PNG or JPEG buffer into { data: Buffer, width, height } (RGBA).
- * Returns null for unsupported formats.
+ * Returns null for unsupported formats, or when the image's declared
+ * dimensions exceed MAX_IMAGE_PIXELS (checked before decoding so a tiny file
+ * with an inflated header can't force a huge allocation — see
+ * MAX_IMAGE_PIXELS above).
  * @param {Buffer} buf
  * @param {string} format
  * @returns {{ data: Buffer, width: number, height: number } | null}
  */
 function decodeImage(buf, format) {
   if (format === "png") {
+    const dims = readPngDimensions(buf);
+    if (!dims || dims.width * dims.height > MAX_IMAGE_PIXELS) return null;
     try { return PNG.sync.read(buf); } catch { return null; }
   }
   if (format === "jpeg") {
-    try { return jpeg.decode(buf, { useTArray: false }); } catch { return null; }
+    try {
+      // jpeg-js already defaults maxResolutionInMP/maxMemoryUsageInMB, but
+      // pin them to the same budget as PNG for consistency.
+      return jpeg.decode(buf, { useTArray: false, maxResolutionInMP: MAX_IMAGE_PIXELS / 1_000_000 });
+    } catch { return null; }
   }
   return null;
 }
