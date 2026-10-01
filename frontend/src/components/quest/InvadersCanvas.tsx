@@ -203,7 +203,24 @@ function makeFormation(view: ViewSize, level: number): {
   originX: number;
   originY: number;
 } {
-  const formationW = COLS * (INVADER_W + INVADER_GAP_X) - INVADER_GAP_X;
+  // INVADER_GAP_X is tuned assuming a wide-enough play field that the
+  // formation has real room to march before hitting a wall. On a narrow
+  // mobile viewport the formation (fixed at COLS * (INVADER_W + gap) wide)
+  // leaves only a few px of margin on each side, so it bounces off the
+  // walls almost immediately and descends constantly -- eating through the
+  // originY clearance below in a couple of seconds regardless of how much
+  // was granted. Shrink just the gap (not INVADER_W, so bullet/collision
+  // hit-boxes are untouched) to guarantee MIN_SIDE_MARGIN of real march
+  // room on each side. No-op once the field is wide enough for the
+  // original gap (desktop).
+  const MIN_SIDE_MARGIN = 40;
+  const maxFormationW = view.w - MIN_SIDE_MARGIN * 2;
+  const naturalFormationW = COLS * (INVADER_W + INVADER_GAP_X) - INVADER_GAP_X;
+  const gapX =
+    naturalFormationW > maxFormationW
+      ? Math.max(2, (maxFormationW + INVADER_GAP_X) / COLS - INVADER_W)
+      : INVADER_GAP_X;
+  const formationW = COLS * (INVADER_W + gapX) - gapX;
   const originX = Math.max(20, (view.w - formationW) / 2);
   // originY is tuned as a fixed pixel offset assuming a reasonably tall
   // canvas (desktop: .quest-canvas-frame's 5:3 aspect ratio at typical
@@ -231,7 +248,7 @@ function makeFormation(view: ViewSize, level: number): {
         id: id++,
         col: c,
         row: r,
-        x: originX + c * (INVADER_W + INVADER_GAP_X),
+        x: originX + c * (INVADER_W + gapX),
         y: originY + r * (INVADER_H + INVADER_GAP_Y),
         alive: true,
         kind,
