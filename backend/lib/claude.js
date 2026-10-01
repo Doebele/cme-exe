@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "fs";
 import { readJson, PERSONAS_FILE, API_KEYS_FILE } from "./storage.js";
-import { detectProvider, callProvider } from "./providers.js";
+import { resolveProvider, callProvider } from "./providers.js";
 
 /**
  * Default model used when no model is passed. Per the spec we try to read it
@@ -94,7 +94,8 @@ function sanitizeText(text) {
   if (typeof text !== "string") return String(text ?? "");
   return text
     .replace(/sk-ant-[A-Za-z0-9_-]+/g, "sk-ant-***")
-    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***");
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/\b(?:xai-|gsk_|pplx-|crsr_|AIza)[A-Za-z0-9_-]+/g, "***");
 }
 
 /**
@@ -116,7 +117,7 @@ function normalizeError(err) {
  * @property {Array<{ role: 'user'|'assistant', content: string | Array<any> }>} messages
  * @property {string} [model]
  * @property {number} [maxTokens]
- * @property {string} [visitorApiKey]  If set, use the visitor's key (Full mode).
+ * @property {string | {key: string, provider?: string | null}} [visitorApiKey]  If set, use the visitor's key (Full mode). The object form carries the provider chosen in the widget.
  */
 
 /**
@@ -133,6 +134,19 @@ function extractText(msg) {
 }
 
 /**
+ * Split a visitor credential into key + resolved provider config.
+ * @param {string | {key: string, provider?: string | null} | undefined | null} visitor
+ * @returns {{ key: string, cfg: import('./providers.js').ProviderConfig | null } | null}
+ */
+function visitorTarget(visitor) {
+  if (!visitor) return null;
+  const key = typeof visitor === "string" ? visitor : visitor.key;
+  const hint = typeof visitor === "string" ? null : visitor.provider;
+  if (!key) return null;
+  return { key, cfg: resolveProvider(key, hint) };
+}
+
+/**
  * Non-streaming Claude call (Hybrid or Full mode).
  * @param {ClaudeCallArgs} args
  * @returns {Promise<{ text: string, usage: any, model: string }>}
@@ -142,14 +156,17 @@ export async function callClaude({ systemPrompt, messages, model, maxTokens, vis
   // (OpenAI, Kimi, Z.AI, Gemini, Cursor), delegate to callProvider so we
   // speak the right API format. Hybrid mode (no visitor key) always uses
   // Anthropic since that's what the server is configured with.
-  if (visitorApiKey) {
-    const detected = detectProvider(visitorApiKey);
-    if (detected && detected.id !== "anthropic") {
+  const target = visitorTarget(visitorApiKey);
+  if (target) {
+    if (!target.cfg) {
+      throw Object.assign(new Error("Unknown API key provider — pick one next to the key field."), { status: 400 });
+    }
+    if (target.cfg.id !== "anthropic") {
       try {
         const result = await callProvider({
-          provider: detected.id,
-          apiKey: visitorApiKey,
-          model: model || detected.defaultModel,
+          provider: target.cfg.id,
+          apiKey: target.key,
+          model,
           systemPrompt,
           messages,
           maxTokens: maxTokens ?? 1024,
@@ -171,7 +188,7 @@ export async function callClaude({ systemPrompt, messages, model, maxTokens, vis
     }
   }
 
-  const client = visitorApiKey ? makeVisitorClient(visitorApiKey) : getServerClient();
+  const client = target ? makeVisitorClient(target.key) : getServerClient();
   const usedModel = model || (await resolveDefaultModel());
   try {
     const msg = await client.messages.create({
@@ -202,14 +219,17 @@ export async function streamClaude({ systemPrompt, messages, model, maxTokens, v
   // token — true token-by-token streaming across all 6 providers would
   // require per-provider stream implementations. The UX impact is minimal
   // because the typewriter effect on the frontend re-chunks the text anyway.
-  if (visitorApiKey) {
-    const detected = detectProvider(visitorApiKey);
-    if (detected && detected.id !== "anthropic") {
+  const target = visitorTarget(visitorApiKey);
+  if (target) {
+    if (!target.cfg) {
+      throw Object.assign(new Error("Unknown API key provider — pick one next to the key field."), { status: 400 });
+    }
+    if (target.cfg.id !== "anthropic") {
       try {
         const result = await callProvider({
-          provider: detected.id,
-          apiKey: visitorApiKey,
-          model: model || detected.defaultModel,
+          provider: target.cfg.id,
+          apiKey: target.key,
+          model,
           systemPrompt,
           messages,
           maxTokens: maxTokens ?? 1024,
@@ -232,7 +252,7 @@ export async function streamClaude({ systemPrompt, messages, model, maxTokens, v
     }
   }
 
-  const client = visitorApiKey ? makeVisitorClient(visitorApiKey) : getServerClient();
+  const client = target ? makeVisitorClient(target.key) : getServerClient();
   const usedModel = model || (await resolveDefaultModel());
   try {
     const stream = client.messages.stream({

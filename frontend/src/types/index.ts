@@ -1,6 +1,21 @@
 export type ThemeId = "vector-green" | "crt-amber" | "y2k-vaporwave";
 
-export type AiProvider = "anthropic" | "openai" | "kimi" | "zai" | "gemini" | "cursor";
+export type AiProvider =
+  | "anthropic"
+  | "openai"
+  | "kimi"
+  | "zai"
+  | "gemini"
+  | "cursor"
+  | "xai"
+  | "mistral"
+  | "deepseek"
+  | "qwen"
+  | "kimi-code"
+  | "zai-cn"
+  | "groq"
+  | "perplexity"
+  | "openrouter";
 
 export type PersonaId = "observer" | "machine" | "curator";
 

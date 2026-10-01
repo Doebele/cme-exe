@@ -1,6 +1,7 @@
 import { Router } from "express";
 import crypto from "crypto";
 import { callClaude, streamClaude } from "../lib/claude.js";
+import { readVisitor } from "../lib/visitor.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { readJson, SETTINGS_FILE } from "../lib/storage.js";
 
@@ -58,22 +59,6 @@ function validateBody(body) {
 }
 
 /**
- * Extract a visitor-supplied API key from request headers (Full mode).
- * @param {import('express').Request} req
- * @returns {string | null}
- */
-function extractVisitorKey(req) {
-  const auth = req.get("authorization");
-  if (auth && /^bearer\s+/i.test(auth)) {
-    const key = auth.replace(/^bearer\s+/i, "").trim();
-    if (key) return key;
-  }
-  const xKey = req.get("x-visitor-key");
-  if (xKey && xKey.trim()) return xKey.trim();
-  return null;
-}
-
-/**
  * Write one Server-Sent-Event frame.
  * @param {import('express').Response} res
  * @param {string} type
@@ -96,7 +81,7 @@ function sse(res, type, extra) {
  * @param {any[]} opts.messages
  * @param {string} [opts.model]
  * @param {number} [opts.maxTokens]
- * @param {string} [opts.visitorApiKey]
+ * @param {string | {key: string, provider?: string | null}} [opts.visitorApiKey]
  * @param {((info: { model: string, usage: any }) => void) | null} [opts.onDone] Optional anonymized logging hook.
  */
 async function runStream({ res, req, systemPrompt, messages, model, maxTokens, visitorApiKey, onDone }) {
@@ -145,7 +130,8 @@ function sanitizeForClient(err) {
     (typeof err === "object" && err && /** @type {any} */ (err).message) || String(err);
   return raw
     .replace(/sk-ant-[A-Za-z0-9_-]+/g, "sk-ant-***")
-    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***");
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/\b(?:xai-|gsk_|pplx-|crsr_|AIza)[A-Za-z0-9_-]+/g, "***");
 }
 
 /**
@@ -219,7 +205,8 @@ router.post("/proxy", ash(async (req, res) => {
   const validationError = validateBody(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
 
-  const visitorApiKey = extractVisitorKey(req);
+  const { visitor: visitorApiKey, error: keyError } = readVisitor(req);
+  if (keyError) return res.status(400).json({ error: keyError });
   if (!visitorApiKey) {
     return res.status(401).json({
       error: "Visitor API key required. Send it via 'Authorization: Bearer <key>' or 'X-Visitor-Key: <key>'.",

@@ -1,3 +1,4 @@
+import { getEffectiveProvider } from "./apiKey";
 /**
  * Streaming chat helper for the dual-mode AI routes.
  *
@@ -99,7 +100,11 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (visitorApiKey) headers["Authorization"] = `Bearer ${visitorApiKey}`;
+  if (visitorApiKey) {
+    headers["Authorization"] = `Bearer ${visitorApiKey}`;
+    const provider = getEffectiveProvider();
+    if (provider) headers["X-Visitor-Provider"] = provider;
+  }
 
   let res: Response;
   try {

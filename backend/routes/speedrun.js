@@ -7,6 +7,7 @@
  */
 import { Router } from "express";
 import { rateLimit } from "../lib/rateLimit.js";
+import { readVisitor } from "../lib/visitor.js";
 import { readJson, SETTINGS_FILE } from "../lib/storage.js";
 import { startRun, startUrlRun, stepRun, generateManifest, getRun } from "../lib/speedrun.js";
 import { pickHybridRecording } from "../lib/recordings.js";
@@ -57,7 +58,8 @@ function sanitizeForClient(err) {
     (typeof err === "object" && err && /** @type {any} */ (err).message) || String(err);
   return raw
     .replace(/sk-ant-[A-Za-z0-9_-]+/g, "sk-ant-***")
-    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***");
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/\b(?:xai-|gsk_|pplx-|crsr_|AIza)[A-Za-z0-9_-]+/g, "***");
 }
 
 /**
@@ -78,26 +80,12 @@ function statusForError(err) {
  * @returns {Promise<{mode:'hybrid'|'full', visitorApiKey:string|null, blocked?:{status:number, body:object}}>}
  */
 async function resolveMode(req) {
-  // Prefer an explicit body field, then the same headers /ai/* understands.
-  const fromBody = req.body?.visitorApiKey;
-  const fromHeader =
-    (req.get("authorization") || "").replace(/^bearer\s+/i, "").trim() ||
-    (req.get("x-visitor-key") || "").trim();
-  const visitorApiKey =
-    typeof fromBody === "string" && fromBody.trim()
-      ? fromBody.trim()
-      : fromHeader || null;
-
-  if (visitorApiKey) {
-    if (!/^sk-/.test(visitorApiKey)) {
-      return {
-        mode: "full",
-        visitorApiKey: null,
-        blocked: { status: 400, body: { error: "visitorApiKey must start with 'sk-'." } },
-      };
-    }
-    return { mode: "full", visitorApiKey };
+  // Body field / Authorization / X-Visitor-Key (+ provider hint) — same as /ai/*.
+  const { visitor, error } = readVisitor(req);
+  if (error) {
+    return { mode: "full", visitorApiKey: null, blocked: { status: 400, body: { error } } };
   }
+  if (visitor) return { mode: "full", visitorApiKey: visitor };
 
   // Hybrid: rate-limit by IP.
   const limit = await hybridLimit();
@@ -230,15 +218,8 @@ router.post("/step", ash(async (req, res) => {
   // run-id ownership — a visitor can only step runs that exist (and runs
   // expire after 24h). We still need visitorApiKey so the Claude client can
   // use Full mode if the visitor provided a key.
-  const fromBody = req.body?.visitorApiKey;
-  const fromHeader =
-    (req.get("authorization") || "").replace(/^bearer\s+/i, "").trim() ||
-    (req.get("x-visitor-key") || "").trim();
-  const visitorApiKey =
-    typeof fromBody === "string" && fromBody.trim() ? fromBody.trim() : fromHeader || null;
-  if (visitorApiKey && !/^sk-/.test(visitorApiKey)) {
-    return res.status(400).json({ error: "visitorApiKey must start with 'sk-'." });
-  }
+  const { visitor: visitorApiKey, error: keyError } = readVisitor(req);
+  if (keyError) return res.status(400).json({ error: keyError });
   // Server-key presence is checked inside stepRun when it actually needs to
   // call Claude (it does NOT for step 0, which is synthesized).
 
@@ -276,15 +257,8 @@ router.post("/manifest", ash(async (req, res) => {
 
   // Same rationale as /step: rate-limit only /start. Visitor key still flows
   // through so the manifest generation can use Full mode when applicable.
-  const fromBody = req.body?.visitorApiKey;
-  const fromHeader =
-    (req.get("authorization") || "").replace(/^bearer\s+/i, "").trim() ||
-    (req.get("x-visitor-key") || "").trim();
-  const visitorApiKey =
-    typeof fromBody === "string" && fromBody.trim() ? fromBody.trim() : fromHeader || null;
-  if (visitorApiKey && !/^sk-/.test(visitorApiKey)) {
-    return res.status(400).json({ error: "visitorApiKey must start with 'sk-'." });
-  }
+  const { visitor: visitorApiKey, error: keyError } = readVisitor(req);
+  if (keyError) return res.status(400).json({ error: keyError });
 
   try {
     const result = await generateManifest({ runId, visitorApiKey });

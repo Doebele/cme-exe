@@ -2,25 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { useApiKey } from "../hooks/useApiKey";
 import type { ProviderId } from "../lib/apiKey";
 import {
-  AMBIGUOUS_PROVIDERS,
+  VISITOR_PROVIDER_ORDER,
   PROVIDERS,
   providerLabel,
 } from "../lib/apiKey";
 
-const PLACEHOLDER_INITIAL = "sk-ant-… / sk-… / AIza… / crsr_…";
+const PLACEHOLDER_INITIAL = "API key (Claude, GPT, Gemini, Grok, Mistral, Kimi, Z.AI…)";
 const PLACEHOLDER_REPLACE = "(key set — paste to replace)";
 
 /**
- * Tiny inline dropdown shown only when the saved key uses an ambiguous `sk-`
- * prefix (shared by OpenAI/Kimi/Z.AI). Lets the visitor pick which one. For
- * distinctive prefixes (sk-ant-, AIza, crsr_) the provider is locked and this
+ * Tiny inline dropdown shown when the saved key doesn't identify its provider
+ * (generic `sk-`, or no known prefix such as Mistral). For distinctive
+ * prefixes (sk-ant-, xai-, AIza, gsk_, …) the provider is locked and this
  * control is hidden.
  */
 function ProviderSelect({
   value,
   onChange,
 }: {
-  value: ProviderId;
+  value: ProviderId | "";
   onChange: (id: ProviderId) => void;
 }) {
   return (
@@ -32,7 +32,12 @@ function ProviderSelect({
         className="font-display bg-transparent border border-text-secondary/40 focus:border-accent outline-none px-1 py-1 text-xs text-text-primary"
         aria-label="Provider for this key"
       >
-        {AMBIGUOUS_PROVIDERS.map((id) => (
+        {value === "" && (
+          <option value="" disabled className="bg-bg-primary text-text-primary">
+            Select…
+          </option>
+        )}
+        {VISITOR_PROVIDER_ORDER.map((id) => (
           <option key={id} value={id} className="bg-bg-primary text-text-primary">
             {PROVIDERS[id].label}
           </option>
@@ -91,9 +96,9 @@ export default function ApiKeyWidget() {
     }
   };
 
-  // The effective provider id used to drive the dropdown selection. When a key
-  // is ambiguous and no override is set, default to OpenAI (most common case).
-  const ambiguousProviderId: ProviderId = providerOverride ?? provider ?? "openai";
+  // Dropdown selection: override, else the detected provider; empty when the
+  // key wasn't recognised at all (the visitor must pick).
+  const ambiguousProviderId: ProviderId | "" = providerOverride ?? provider ?? "";
 
   // Collapsed: show "Set API key" or "<Provider> ✓".
   if (!open) {
@@ -105,7 +110,7 @@ export default function ApiKeyWidget() {
         aria-expanded={false}
         aria-haspopup="dialog"
       >
-        {hasKey ? `${providerLabel(provider)} ✓` : "Set API key"}
+        {hasKey ? (provider ? `${providerLabel(provider)} ✓` : "Pick provider ⚠") : "Set API key"}
       </button>
     );
   }
@@ -145,6 +150,11 @@ export default function ApiKeyWidget() {
       >
         Save
       </button>
+      {provider === "cursor" && (
+        <span className="font-display text-xs text-accent-secondary" role="alert">
+          Cursor keys can't call LLMs (no inference API) — use another provider's key.
+        </span>
+      )}
       {hasKey && (
         <button
           type="button"

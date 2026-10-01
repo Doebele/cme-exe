@@ -50,7 +50,7 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   },
   kimi: {
     id: "kimi",
-    label: "Kimi",
+    label: "Kimi (Moonshot)",
     prefixBadge: "sk-",
     placeholder: "sk-…",
     detectable: false,
@@ -69,6 +69,69 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     placeholder: "crsr_…",
     detectable: true,
   },
+  "xai": {
+    id: "xai",
+    label: "xAI (Grok)",
+    prefixBadge: "xai-",
+    placeholder: "xai-…",
+    detectable: true,
+  },
+  "mistral": {
+    id: "mistral",
+    label: "Mistral",
+    prefixBadge: "",
+    placeholder: "…",
+    detectable: false,
+  },
+  "deepseek": {
+    id: "deepseek",
+    label: "DeepSeek",
+    prefixBadge: "sk-",
+    placeholder: "sk-…",
+    detectable: false,
+  },
+  "qwen": {
+    id: "qwen",
+    label: "Qwen",
+    prefixBadge: "sk-",
+    placeholder: "sk-…",
+    detectable: false,
+  },
+  "kimi-code": {
+    id: "kimi-code",
+    label: "Kimi Code",
+    prefixBadge: "sk-kimi-",
+    placeholder: "sk-kimi-…",
+    detectable: true,
+  },
+  "zai-cn": {
+    id: "zai-cn",
+    label: "BigModel (GLM, China)",
+    prefixBadge: "",
+    placeholder: "…",
+    detectable: false,
+  },
+  "groq": {
+    id: "groq",
+    label: "Groq",
+    prefixBadge: "gsk_",
+    placeholder: "gsk_…",
+    detectable: true,
+  },
+  "perplexity": {
+    id: "perplexity",
+    label: "Perplexity",
+    prefixBadge: "pplx-",
+    placeholder: "pplx-…",
+    detectable: true,
+  },
+  "openrouter": {
+    id: "openrouter",
+    label: "OpenRouter",
+    prefixBadge: "sk-or-",
+    placeholder: "sk-or-…",
+    detectable: true,
+  },
 };
 
 /** Stable display order (matches backend PROVIDER_IDS). */
@@ -82,11 +145,26 @@ export const PROVIDER_ORDER: ProviderId[] = [
 ];
 
 /**
- * Providers that share the generic `sk-` prefix and therefore cannot be
- * distinguished by key alone. Used by the widget to decide whether to show
- * the disambiguation dropdown.
+ * Providers a visitor can pick in the widget. Admin (hybrid key) screens keep
+ * using PROVIDER_ORDER; this is the full Full-mode list. Cursor is detected
+ * but not selectable: its keys have no inference API (the backend says so).
  */
-export const AMBIGUOUS_PROVIDERS: ProviderId[] = ["openai", "kimi", "zai"];
+export const VISITOR_PROVIDER_ORDER: ProviderId[] = [
+  "anthropic",
+  "openai",
+  "gemini",
+  "xai",
+  "mistral",
+  "deepseek",
+  "qwen",
+  "kimi",
+  "kimi-code",
+  "zai",
+  "zai-cn",
+  "groq",
+  "perplexity",
+  "openrouter",
+];
 
 export function getApiKey(): string | null {
   try {
@@ -115,30 +193,37 @@ export function clearApiKey(): void {
 }
 
 /**
- * Detect provider purely from the key prefix. Distinctive prefixes are checked
- * before the generic `sk-`. Kimi and Z.AI both use `sk-` and are therefore not
- * distinguishable from OpenAI by key alone — they resolve to "openai" here and
- * require a manual override via {@link setProviderOverride}.
- *
- * Order: sk-ant- → anthropic, AIza → gemini, crsr_/cursor- → cursor,
- *        sk- → openai (default fallback for ambiguous keys).
+ * Detect provider from the key prefix (mirrors backend/lib/providers.js).
+ * Longest distinctive prefix wins; a bare `sk-` falls back to OpenAI. Keys with
+ * no unique prefix (Mistral, DeepSeek, Qwen, Kimi, Z.AI, …) return null or
+ * "openai" and need a manual pick via {@link setProviderOverride}.
  */
+const PREFIXES: Array<[string, ProviderId]> = [
+  ["sk-ant-", "anthropic"],
+  ["sk-or-", "openrouter"],
+  ["sk-kimi-", "kimi-code"],
+  ["xai-", "xai"],
+  ["gsk_", "groq"],
+  ["pplx-", "perplexity"],
+  ["AIza", "gemini"],
+  ["crsr_", "cursor"],
+  ["cursor-", "cursor"],
+  ["sk-", "openai"],
+];
+
 export function detectProvider(key: string): ProviderId | null {
   const trimmed = key.trim();
   if (!trimmed) return null;
-  if (trimmed.startsWith("sk-ant-")) return "anthropic";
-  if (trimmed.startsWith("AIza")) return "gemini";
-  if (trimmed.startsWith("crsr_") || trimmed.startsWith("cursor-")) return "cursor";
-  if (trimmed.startsWith("sk-")) return "openai";
-  return null;
+  return PREFIXES.find(([prefix]) => trimmed.startsWith(prefix))?.[1] ?? null;
 }
 
 /**
- * Returns true when the key's prefix is shared by multiple providers
- * (OpenAI/Kimi/Z.AI all use `sk-`), meaning the user may need to disambiguate.
+ * True when the key's prefix doesn't pin down a provider (generic `sk-`, or no
+ * recognised prefix at all) so the visitor should confirm it in the dropdown.
  */
 export function isAmbiguousKey(key: string): boolean {
-  return detectProvider(key) === "openai";
+  const d = detectProvider(key);
+  return d === null || d === "openai";
 }
 
 export function getProviderOverride(): ProviderId | null {

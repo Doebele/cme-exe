@@ -1,4 +1,4 @@
-import { getApiKey } from "./apiKey";
+import { getApiKey, getEffectiveProvider } from "./apiKey";
 
 // ---------------------------------------------------------------------------
 // Types — mirror docs/speedrun-contract.md sections 3 & 4.
@@ -220,7 +220,11 @@ const RECORDINGS_BASE = "/api/recordings";
 function authHeaders(visitorApiKey?: string | null): Record<string, string> {
   const headers: Record<string, string> = {};
   const key = visitorApiKey ?? getApiKey();
-  if (key) headers["Authorization"] = `Bearer ${key}`;
+  if (key) {
+    headers["Authorization"] = `Bearer ${key}`;
+    const provider = getEffectiveProvider();
+    if (provider) headers["X-Visitor-Provider"] = provider;
+  }
   return headers;
 }
 

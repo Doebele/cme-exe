@@ -1,6 +1,7 @@
 /**
- * AI provider registry — supports Anthropic, OpenAI, Kimi (Moonshot), Z.AI
- * (Zhipu BigModel), Gemini (Google), and Cursor (which proxies OpenAI-compat).
+ * AI provider registry — Anthropic, OpenAI, Gemini, xAI (Grok), Mistral,
+ * DeepSeek, Qwen, Kimi (Moonshot / Kimi Code), Z.AI (GLM), Groq, Perplexity,
+ * OpenRouter, plus Cursor (recognized, but has no inference API).
  *
  * Most providers speak the OpenAI Chat Completions format. Anthropic and
  * Gemini have their own SDKs. This module centralizes the per-provider
@@ -13,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @typedef {"anthropic" | "openai" | "kimi" | "zai" | "gemini" | "cursor"} ProviderId
+ * @typedef {"anthropic" | "openai" | "gemini" | "xai" | "mistral" | "deepseek" | "qwen" | "kimi" | "kimi-code" | "zai" | "zai-cn" | "groq" | "perplexity" | "openrouter" | "cursor"} ProviderId
  */
 
 /**
@@ -22,10 +23,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * @property {string} label             Human-readable name for UIs.
  * @property {string[]} keyPrefixes     Substrings that identify a key for this provider.
  * @property {string} baseUrl           OpenAI-compat base URL (where applicable).
- * @property {string} defaultModel      Fallback model id.
+ * @property {string | null} defaultModel  Fallback model id (null → first chat model from /models).
  * @property {"openai" | "anthropic" | "gemini"} apiFormat   Which client to use.
  * @property {string} [envVar]          Environment variable for server-configured key.
  * @property {boolean} supportsSystemPrompt   Whether the API accepts system prompts.
+ * @property {string} [unsupported]     If set, the provider is recognized but cannot be called (message for the visitor).
  */
 
 /** @type {Record<ProviderId, ProviderConfig>} */
@@ -40,6 +42,7 @@ export const PROVIDERS = {
     envVar: "ANTHROPIC_API_KEY",
     supportsSystemPrompt: true,
   },
+  // Generic `sk-` fallback — see detectProvider().
   openai: {
     id: "openai",
     label: "OpenAI (GPT)",
@@ -50,69 +53,205 @@ export const PROVIDERS = {
     envVar: "OPENAI_API_KEY",
     supportsSystemPrompt: true,
   },
-  kimi: {
-    id: "kimi",
-    label: "Kimi (Moonshot AI)",
-    keyPrefixes: ["sk-"],
-    baseUrl: "https://api.moonshot.cn/v1",
-    defaultModel: "moonshot-v1-32k",
-    apiFormat: "openai",
-    envVar: "KIMI_API_KEY",
-    supportsSystemPrompt: true,
-  },
-  zai: {
-    id: "zai",
-    label: "Z.AI (Zhipu GLM)",
-    keyPrefixes: ["sk-"],
-    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    defaultModel: "glm-4-plus",
-    apiFormat: "openai",
-    envVar: "ZAI_API_KEY",
-    supportsSystemPrompt: true,
-  },
   gemini: {
     id: "gemini",
     label: "Google Gemini",
     keyPrefixes: ["AIza"],
     baseUrl: "https://generativelanguage.googleapis.com",
-    defaultModel: "gemini-1.5-flash",
+    defaultModel: "gemini-2.5-flash",
     apiFormat: "gemini",
     envVar: "GEMINI_API_KEY",
     supportsSystemPrompt: true,
   },
+  "xai": {
+    id: "xai",
+    label: "xAI (Grok)",
+    keyPrefixes: ["xai-"],
+    baseUrl: "https://api.x.ai/v1",
+    defaultModel: "grok-4",
+    apiFormat: "openai",
+    envVar: "XAI_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "mistral": {
+    id: "mistral",
+    label: "Mistral",
+    keyPrefixes: [],
+    baseUrl: "https://api.mistral.ai/v1",
+    defaultModel: "mistral-large-latest",
+    apiFormat: "openai",
+    envVar: "MISTRAL_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "deepseek": {
+    id: "deepseek",
+    label: "DeepSeek",
+    keyPrefixes: [],
+    baseUrl: "https://api.deepseek.com/v1",
+    defaultModel: "deepseek-chat",
+    apiFormat: "openai",
+    envVar: "DEEPSEEK_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "qwen": {
+    id: "qwen",
+    label: "Alibaba (Qwen)",
+    keyPrefixes: [],
+    baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    defaultModel: "qwen-plus",
+    apiFormat: "openai",
+    envVar: "QWEN_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "kimi": {
+    id: "kimi",
+    label: "Kimi (Moonshot)",
+    keyPrefixes: [],
+    baseUrl: "https://api.moonshot.ai/v1",
+    defaultModel: "moonshot-v1-32k",
+    apiFormat: "openai",
+    envVar: "KIMI_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "kimi-code": {
+    id: "kimi-code",
+    label: "Kimi Code",
+    keyPrefixes: ["sk-kimi-"],
+    baseUrl: "https://api.kimi.ai/coding/v1",
+    defaultModel: null,
+    apiFormat: "openai",
+    envVar: "KIMI_CODE_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "zai": {
+    id: "zai",
+    label: "Z.AI (GLM)",
+    keyPrefixes: [],
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    defaultModel: "glm-4-plus",
+    apiFormat: "openai",
+    envVar: "ZAI_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "zai-cn": {
+    id: "zai-cn",
+    label: "BigModel (GLM, China)",
+    keyPrefixes: [],
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    defaultModel: "glm-4-plus",
+    apiFormat: "openai",
+    envVar: "ZAI_CN_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "groq": {
+    id: "groq",
+    label: "Groq",
+    keyPrefixes: ["gsk_"],
+    baseUrl: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+    apiFormat: "openai",
+    envVar: "GROQ_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "perplexity": {
+    id: "perplexity",
+    label: "Perplexity",
+    keyPrefixes: ["pplx-"],
+    baseUrl: "https://api.perplexity.ai",
+    defaultModel: "sonar",
+    apiFormat: "openai",
+    envVar: "PERPLEXITY_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  "openrouter": {
+    id: "openrouter",
+    label: "OpenRouter",
+    keyPrefixes: ["sk-or-"],
+    baseUrl: "https://openrouter.ai/api/v1",
+    defaultModel: "openrouter/auto",
+    apiFormat: "openai",
+    envVar: "OPENROUTER_API_KEY",
+    supportsSystemPrompt: true,
+  },
+  // Cursor keys (crsr_…) only unlock the Admin / Cloud Agents API — Cursor
+  // documents that it is not a chat-completions or model-inference API.
   cursor: {
     id: "cursor",
     label: "Cursor",
     keyPrefixes: ["crsr_", "cursor-"],
-    baseUrl: "https://api2.cursor.sh/openai",
-    defaultModel: "gpt-4o",
+    baseUrl: "https://api.cursor.com",
+    defaultModel: null,
     apiFormat: "openai",
     envVar: "CURSOR_API_KEY",
     supportsSystemPrompt: true,
+    unsupported:
+      "Cursor API keys cannot be used for LLM calls: Cursor only offers a Cloud Agents / Admin API, not a chat-completions API. Use a key from Anthropic, OpenAI, Gemini, xAI, Mistral, DeepSeek, Kimi, Z.AI, Groq or OpenRouter instead.",
   },
 };
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS);
 
 /**
- * Detect which provider a given API key belongs to. Returns null if unknown.
- * Detection order matters: more specific prefixes (sk-ant-, AIza, crsr_)
- * must be tested before generic ones (sk-).
+ * Detect which provider a given API key belongs to from its prefix alone.
+ * Distinctive prefixes win; a bare `sk-` falls back to OpenAI. Providers whose
+ * keys carry no unique prefix (Mistral, DeepSeek, Qwen, Kimi, Z.AI …) can only
+ * be selected via an explicit hint — see {@link resolveProvider}.
  *
  * @param {string} apiKey
  * @returns {ProviderConfig | null}
  */
 export function detectProvider(apiKey) {
   if (!apiKey || typeof apiKey !== "string") return null;
-  // Order matters — check distinctive prefixes first.
-  const order = ["anthropic", "gemini", "cursor", "kimi", "zai", "openai"];
-  for (const id of order) {
-    const cfg = PROVIDERS[id];
-    if (cfg.keyPrefixes.some((p) => apiKey.startsWith(p))) {
-      return cfg;
+  let best = null;
+  let bestLen = 0;
+  for (const cfg of Object.values(PROVIDERS)) {
+    for (const p of cfg.keyPrefixes) {
+      // Longest matching prefix wins: sk-ant- / sk-or- / sk-kimi- beat sk-.
+      if (apiKey.startsWith(p) && p.length > bestLen) {
+        best = cfg;
+        bestLen = p.length;
+      }
     }
   }
-  return null;
+  return best;
+}
+
+/**
+ * Provider for a visitor key: an explicit, valid hint (from the widget's
+ * provider dropdown) beats prefix detection.
+ *
+ * @param {string} apiKey
+ * @param {string | null | undefined} [hint]
+ * @returns {ProviderConfig | null}
+ */
+export function resolveProvider(apiKey, hint) {
+  if (hint && Object.prototype.hasOwnProperty.call(PROVIDERS, hint)) return PROVIDERS[hint];
+  return detectProvider(apiKey);
+}
+
+/**
+ * Validate a visitor key + optional provider hint (Full mode). Replaces the old
+ * hard-coded `sk-` check.
+ *
+ * @param {string} apiKey
+ * @param {string | null | undefined} [hint]
+ * @returns {{ provider: ProviderConfig } | { error: string }}
+ */
+export function validateVisitorKey(apiKey, hint) {
+  if (typeof apiKey !== "string" || apiKey.length < 8 || /\s/.test(apiKey)) {
+    return { error: "Invalid API key format." };
+  }
+  const provider = resolveProvider(apiKey, hint);
+  if (!provider) {
+    return {
+      error:
+        "Could not tell which provider this key belongs to. Pick the provider next to the key field (supported: " +
+        Object.values(PROVIDERS).filter((p) => !p.unsupported).map((p) => p.label).join(", ") +
+        ").",
+    };
+  }
+  if (provider.unsupported) return { error: provider.unsupported };
+  return { provider };
 }
 
 /**
@@ -143,7 +282,11 @@ export async function callProvider(opts) {
   if (!cfg) throw new Error(`Unknown provider: ${providerId}`);
   if (!apiKey) throw new Error(`No API key for provider: ${providerId}`);
 
-  const model = opts.model || cfg.defaultModel;
+  if (cfg.unsupported) throw Object.assign(new Error(cfg.unsupported), { status: 400 });
+
+  // A Claude model id (e.g. from a persona) is meaningless to other providers.
+  const requested = providerId !== "anthropic" && /^claude/i.test(opts.model || "") ? null : opts.model;
+  const model = requested || cfg.defaultModel;
 
   if (cfg.apiFormat === "openai") {
     return callOpenAICompat({ cfg, apiKey, model, systemPrompt, messages, maxTokens, signal });
@@ -157,12 +300,21 @@ export async function callProvider(opts) {
   throw new Error(`Unsupported apiFormat: ${cfg.apiFormat}`);
 }
 
-async function callOpenAICompat({ cfg, apiKey, model, systemPrompt, messages, maxTokens, signal }) {
+async function callOpenAICompat({ cfg, apiKey, model: modelIn, systemPrompt, messages, maxTokens, signal }) {
+  let model = modelIn;
   const client = new OpenAI({
     apiKey,
     baseURL: cfg.baseUrl,
     signal,
   });
+  // No static default (Kimi Code): use the first chat model the key can see.
+  if (!model) {
+    const list = await client.models.list();
+    const ids = [];
+    for await (const m of list) ids.push(m.id);
+    model = ids.find((id) => !/embed|tts|whisper|image|moderation|rerank/i.test(id));
+    if (!model) throw Object.assign(new Error(`${cfg.label}: no chat model available for this key.`), { status: 400 });
+  }
   // Cursor's API expects a custom header for auth sometimes; pass through if needed.
   const finalMessages = [];
   if (systemPrompt && cfg.supportsSystemPrompt) {
