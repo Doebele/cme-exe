@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 import { join } from "path";
 import { readJson, writeJson, LAB_FACTS_FILE, PERSONAS_FILE, RUNS_DIR } from "./storage.js";
 import { callClaude } from "./claude.js";
-import { fetchAndExtract, UrlValidationError, BlockedError, FetchTimeoutError, TooLargeError, FetchError, RateLimitError, hostnameForLog } from "./urlFetcher.js";
+import { fetchAndExtract, extractFromPlainText, UrlValidationError, BlockedError, FetchTimeoutError, TooLargeError, FetchError, TargetBlockedError, RateLimitError, hostnameForLog } from "./urlFetcher.js";
 
 // ---- Constants --------------------------------------------------------
 
@@ -566,6 +566,8 @@ export async function startUrlRun({ url, visitorApiKey = null, ip = "" } = {}) {
     sourceHost: hostnameForLog(extracted.url),
     externalPageState: {
       source: "external",
+      origin: extracted.origin || "external",
+      archivedAt: extracted.archivedAt || undefined,
       sourceUrl: extracted.url,
       finalUrl: extracted.finalUrl,
       title: extracted.title,
@@ -589,8 +591,72 @@ export async function startUrlRun({ url, visitorApiKey = null, ip = "" } = {}) {
 
   const initialState = {
     kind: run.kind,
+    origin: run.externalPageState.origin,
+    archivedAt: run.externalPageState.archivedAt || null,
     sourceUrl: run.sourceUrl,
     sourceHost: run.sourceHost,
+    section: run.currentLocation.section,
+    item: run.currentLocation.item,
+    subject: extracted.subject,
+    availableSections,
+    availableItems,
+  };
+  return { runId, initialState };
+}
+
+/**
+ * Start a paste-mode run: the visitor pasted page/profile text (for walled
+ * sites like LinkedIn). Shares the url-speedrun lifecycle — the only
+ * difference is how externalPageState is built.
+ *
+ * @param {{ text:string, title?:string, visitorApiKey?:string|null }} opts
+ * @returns {Promise<{runId:string, initialState:object}>}
+ */
+export async function startPasteRun({ text, title, visitorApiKey = null } = {}) {
+  const extracted = extractFromPlainText(text, title);
+
+  const runId = newRunId();
+  const now = new Date().toISOString();
+  const availableSections = (extracted.sections || []).map((s) => s.id);
+  const availableItems = {};
+  for (const s of extracted.sections || []) {
+    availableItems[s.id] = (s.items || []).map((it) => it.id);
+  }
+  const run = {
+    id: runId,
+    kind: "url-speedrun",
+    sourceUrl: null,
+    sourceHost: null,
+    externalPageState: {
+      source: "paste",
+      origin: "paste",
+      sourceUrl: null,
+      finalUrl: null,
+      title: extracted.title,
+      description: extracted.description,
+      subject: extracted.subject,
+      sections: extracted.sections,
+      fetchedAt: extracted.fetchedAt,
+      contentLengthBytes: extracted.contentLengthBytes,
+      isHtml: false,
+    },
+    status: "running",
+    startedAt: now,
+    completedAt: null,
+    visitorMode: visitorApiKey ? "full" : "hybrid",
+    currentLocation: { section: "hero", item: null },
+    history: [],
+    manifest: null,
+    usage: { inputTokens: 0, outputTokens: 0 },
+  };
+  await saveRun(run);
+
+  const initialState = {
+    kind: run.kind,
+    origin: "paste",
+    archivedAt: null,
+    sourceUrl: null,
+    sourceHost: null,
     section: run.currentLocation.section,
     item: run.currentLocation.item,
     subject: extracted.subject,

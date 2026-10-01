@@ -86,7 +86,7 @@ export default function QuestSection() {
         <h2 className="font-display text-[clamp(1.8rem,5vw,3.5rem)] leading-none crt-glow mt-2">
           DESIGNER&apos;S QUEST
         </h2>
-        <p className="font-display mt-2 text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/60">
+        <p className="font-display mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/60">
           Blast design problems. Free the quotes.
         </p>
       </header>
@@ -147,12 +147,12 @@ export default function QuestSection() {
                   ▶ Start Quest
                 </button>
                 {highScore > 0 && (
-                  <p className="font-display text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/60 mt-4">
+                  <p className="font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/60 mt-4">
                     Best run: {highScore}
                   </p>
                 )}
                 {quotesError && (
-                  <p className="font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary/40 mt-3">
+                  <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/40 mt-3">
                     (quotes unavailable — playing offline)
                   </p>
                 )}
@@ -258,7 +258,7 @@ export default function QuestSection() {
 
       {/* In-run pause hint (desktop). */}
       {status === "playing" && (
-        <p className="mt-4 font-display text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/50">
+        <p className="mt-4 font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/50">
           <kbd>P</kbd> / <kbd>ESC</kbd> to pause
         </p>
       )}

@@ -140,9 +140,12 @@ export default function BootSequence({ onDone }: BootSequenceProps) {
     };
   }, []);
 
-  // Fire the CRT boot sound at phase 1 (after enter gate).
+  // Fire the CRT boot sound at phase 2 — the modem timeline and the BIOS
+  // line timers share T=0 there, so pickups/ring/CED/probes/CONNECT land on
+  // their matching lines. (Starting it in phase 1 left the sound ~450ms
+  // ahead of the text.)
   useEffect(() => {
-    if (phase === 1 && !reduced) playBootSound();
+    if (phase === 2 && !reduced) playBootSound();
   }, [phase, reduced]);
 
   // Enter gate: listen for click / keypress, init audio, then start boot.

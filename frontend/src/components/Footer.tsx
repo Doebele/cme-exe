@@ -15,7 +15,7 @@ export default function Footer() {
             onClick={replayBoot}
             title="Replay boot sequence"
             aria-label="Replay boot sequence"
-            className="font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary/60 hover:text-text-primary border border-text-secondary/20 hover:border-text-secondary/50 px-2 py-1 transition-colors"
+            className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/60 hover:text-text-primary border border-text-secondary/20 hover:border-text-secondary/50 px-2 py-1 transition-colors"
           >
             ⟲ Replay Boot
           </button>

@@ -19,6 +19,15 @@ const RUN_ID_HASH_RE = /^#observer\/r-([a-z0-9]{12})$/i;
 const RECORDING_ID_HASH_RE = /^#observer\/rec-([a-z0-9]{12})$/i;
 const URL_PATTERN = /^https?:\/\/.+/i;
 
+/** Example chips under the URL input. The LinkedIn one intentionally shows
+ *  the archive path — walled profile sites are visited via Wayback. */
+const EXAMPLE_URLS: Array<{ url: string; label: string }> = [
+  { url: "https://en.wikipedia.org/wiki/Don_Norman", label: "Wikipedia · Don Norman" },
+  { url: "https://www.linkedin.com/in/diyapeter/", label: "LinkedIn · via web archive ◧" },
+  { url: "https://www.apple.com/studio/", label: "Company page" },
+  { url: "https://blog.medvesek.com/", label: "A blog" },
+];
+
 function parseRunIdFromHash(hash: string): string | null {
   const m = RUN_ID_HASH_RE.exec(hash);
   if (!m) return null;
@@ -50,8 +59,12 @@ export default function SpeedrunSection() {
     urlSubject,
     urlSections,
     urlSourceUrl,
+    urlOrigin,
+    urlArchivedAt,
+    blockedByTarget,
     start,
     startWithUrl,
+    startWithPaste,
     replay,
     replayRecording,
     share,
@@ -63,6 +76,11 @@ export default function SpeedrunSection() {
   // --- local UI state for the URL input in idle mode ---
   const [urlInput, setUrlInput] = useState("");
   const urlValid = URL_PATTERN.test(urlInput.trim());
+  // --- paste mode (walled pages: LinkedIn, Instagram, …) ---
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteTitle, setPasteTitle] = useState("");
+  const pasteValid = pasteText.trim().length >= 80;
 
   // --- lab-facts for the Stage (with static fallback) ---
   const [works, setWorks] = useState<WorkFact[]>(FALLBACK_WORKS);
@@ -196,11 +214,11 @@ export default function SpeedrunSection() {
           >
             ▶ Start Speedrun
           </button>
-          <p className="font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary/50 text-center">
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/50 text-center">
             ~60s · Claus' work · runs server-side · shareable after
           </p>
           {!hasKey && (
-            <p className="font-display text-[0.55rem] uppercase tracking-[0.12em] text-text-secondary/40 text-center leading-relaxed max-w-xs">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.12em] text-text-secondary/40 text-center leading-relaxed max-w-xs">
               Hybrid mode plays a pre-recorded session. Add your API key (top right)
               for a fresh live run.
             </p>
@@ -215,7 +233,7 @@ export default function SpeedrunSection() {
                   "color-mix(in srgb, var(--color-text-secondary) 25%, transparent)",
               }}
             />
-            <span className="font-display text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/50">
+            <span className="font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/50">
               or
             </span>
             <span
@@ -232,48 +250,144 @@ export default function SpeedrunSection() {
             <p className="font-display text-[0.7rem] uppercase tracking-[0.2em] text-text-secondary text-center">
               Speedrun any URL
             </p>
-            <form
-              className="w-full flex flex-col sm:flex-row gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (urlValid) void startWithUrl(urlInput.trim());
-              }}
-            >
-              <input
-                type="url"
-                inputMode="url"
-                autoComplete="off"
-                spellCheck={false}
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://www.linkedin.com/in/… or any public URL"
-                className="flex-1 min-w-0 px-3 py-2 border bg-transparent outline-none font-display text-xs text-text-primary"
-                style={{
-                  borderColor:
-                    "color-mix(in srgb, var(--color-text-secondary) 30%, transparent)",
-                  caretColor: "var(--color-accent)",
-                }}
-                aria-label="URL to speedrun"
-              />
-              <button
-                type="submit"
-                disabled={!urlValid}
-                className="font-display text-xs uppercase tracking-[0.15em] px-4 py-2 border whitespace-nowrap transition-opacity"
-                style={{
-                  borderColor: "var(--color-accent)",
-                  color: "var(--color-accent)",
-                  opacity: urlValid ? 1 : 0.4,
-                  cursor: urlValid ? "pointer" : "not-allowed",
+            {!pasteMode ? (
+              <>
+                <form
+                  className="w-full flex flex-col sm:flex-row gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (urlValid) void startWithUrl(urlInput.trim());
+                  }}
+                >
+                  <input
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://… or pick an example below"
+                    className="flex-1 min-w-0 px-3 py-2 border bg-transparent outline-none font-display text-xs text-text-primary"
+                    style={{
+                      borderColor:
+                        "color-mix(in srgb, var(--color-text-secondary) 30%, transparent)",
+                      caretColor: "var(--color-accent)",
+                    }}
+                    aria-label="URL to speedrun"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!urlValid}
+                    className="font-display text-xs uppercase tracking-[0.15em] px-4 py-2 border whitespace-nowrap transition-opacity"
+                    style={{
+                      borderColor: "var(--color-accent)",
+                      color: "var(--color-accent)",
+                      opacity: urlValid ? 1 : 0.4,
+                      cursor: urlValid ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    ▶ Visit URL
+                  </button>
+                </form>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {EXAMPLE_URLS.map((ex) => (
+                    <button
+                      key={ex.url}
+                      type="button"
+                      onClick={() => setUrlInput(ex.url)}
+                      className="font-display text-[0.65rem] uppercase tracking-[0.1em] px-2.5 py-1 border transition-colors"
+                      style={{
+                        borderColor:
+                          "color-mix(in srgb, var(--color-text-secondary) 30%, transparent)",
+                        color: "var(--color-text-secondary)",
+                      }}
+                      title={ex.url}
+                    >
+                      {ex.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPasteMode(true)}
+                  className="font-display text-[0.65rem] uppercase tracking-[0.15em] underline underline-offset-4"
+                  style={{ color: "color-mix(in srgb, var(--color-text-secondary) 80%, transparent)" }}
+                >
+                  Walled page (LinkedIn, Instagram…)? Paste its text instead ↗
+                </button>
+                <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/50 text-center leading-relaxed">
+                  The Observer fetches the URL server-side and explores it. ~60–75s.
+                  <br />
+                  Bot-walled sites are visited via the Wayback Machine archive.
+                  <br />
+                  No tracking pixels or JS from the target site run.
+                </p>
+              </>
+            ) : (
+              <form
+                className="w-full flex flex-col gap-2 max-w-xl"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (pasteValid) void startWithPaste(pasteText, pasteTitle.trim() || undefined);
                 }}
               >
-                ▶ Visit URL
-              </button>
-            </form>
-            <p className="font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary/50 text-center leading-relaxed">
-              The Observer fetches the URL server-side and explores it. ~60–75s.
-              <br />
-              No tracking pixels or JS from the target site run.
-            </p>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={pasteTitle}
+                  onChange={(e) => setPasteTitle(e.target.value)}
+                  placeholder="Who is this? (optional, e.g. “Diya Peter — Product Designer”)"
+                  aria-label="Optional subject title"
+                  className="w-full px-3 py-2 border bg-transparent outline-none font-display text-xs text-text-primary"
+                  style={{
+                    borderColor:
+                      "color-mix(in srgb, var(--color-text-secondary) 30%, transparent)",
+                    caretColor: "var(--color-accent)",
+                  }}
+                />
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder={"Open the profile in YOUR browser, select the page text, paste it here…\n\nName, headline, experience, about — whatever you can see."}
+                  rows={6}
+                  spellCheck={false}
+                  aria-label="Pasted page content"
+                  className="w-full px-3 py-2 border bg-transparent outline-none font-display text-xs text-text-primary resize-y"
+                  style={{
+                    borderColor:
+                      "color-mix(in srgb, var(--color-text-secondary) 30%, transparent)",
+                    caretColor: "var(--color-accent)",
+                  }}
+                />
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setPasteMode(false)}
+                    className="font-display text-[0.65rem] uppercase tracking-[0.15em] underline underline-offset-4"
+                    style={{ color: "color-mix(in srgb, var(--color-text-secondary) 80%, transparent)" }}
+                  >
+                    ← back to URL
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!pasteValid}
+                    className="font-display text-xs uppercase tracking-[0.15em] px-4 py-2 border whitespace-nowrap transition-opacity"
+                    style={{
+                      borderColor: "var(--color-accent)",
+                      color: "var(--color-accent)",
+                      opacity: pasteValid ? 1 : 0.4,
+                      cursor: pasteValid ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    ▶ Visit pasted text
+                  </button>
+                </div>
+                <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/50 text-center leading-relaxed">
+                  The Observer explores only what you paste — nothing is fetched.
+                </p>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -320,6 +434,22 @@ export default function SpeedrunSection() {
               The shared server key is busy. Add your own key (top-right) for
               Full mode, or try again shortly.
             </p>
+          )}
+          {blockedByTarget && (
+            <button
+              type="button"
+              onClick={() => {
+                reset();
+                setPasteMode(true);
+              }}
+              className="font-display text-xs uppercase tracking-[0.15em] px-4 py-2 border"
+              style={{
+                borderColor: "var(--color-accent-secondary)",
+                color: "var(--color-accent-secondary)",
+              }}
+            >
+              ⧉ Paste the page text instead
+            </button>
           )}
           <div className="flex gap-3">
             <button
@@ -375,6 +505,8 @@ export default function SpeedrunSection() {
                   subject={urlSubject}
                   sections={urlSections}
                   sourceUrl={urlSourceUrl ?? ""}
+                  origin={urlOrigin}
+                  archivedAt={urlArchivedAt}
                   compact={isMobile}
                 />
               ) : (
@@ -394,6 +526,8 @@ export default function SpeedrunSection() {
               currentLocation={currentLocation}
               visible={cursorVisible && !showManifest}
               compact={isMobile}
+              scanning={(status === "running" || status === "replay") && !isMobile}
+              pulse={thoughts.length}
             />
             {thoughts.length > 0 && !isMobile && !showManifest && (
               <Marginalia
@@ -404,7 +538,7 @@ export default function SpeedrunSection() {
             )}
             {(isReplayRun || isRecording) && (
               <div
-                className="absolute top-2 left-2 font-display text-[0.55rem] uppercase tracking-[0.2em] px-2 py-0.5 border z-30"
+                className="absolute top-2 left-2 font-display text-[0.65rem] uppercase tracking-[0.2em] px-2 py-0.5 border z-30"
                 style={{
                   borderColor: isRecording
                     ? "color-mix(in srgb, var(--color-accent-secondary) 40%, transparent)"
@@ -476,7 +610,7 @@ export default function SpeedrunSection() {
                     THE CURATOR IS WRITING
                   </p>
                   <p
-                    className="font-display text-[0.55rem] uppercase tracking-[0.2em] m-0"
+                    className="font-display text-[0.65rem] uppercase tracking-[0.2em] m-0"
                     style={{ color: "var(--color-text-secondary)", opacity: 0.7 }}
                   >
                     manifest synthesizing…
@@ -538,7 +672,7 @@ export default function SpeedrunSection() {
 
       {/* Step counter footer during active runs */}
       {(status === "running" || status === "replay") && (
-        <p className="mt-4 font-display text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/60">
+        <p className="mt-4 font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/60">
           {(runId || recordingId) ? `${runId ?? recordingId} · ` : ""}step {speedrun.currentStep}
         </p>
       )}

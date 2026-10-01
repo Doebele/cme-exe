@@ -9,7 +9,7 @@ import { Router } from "express";
 import { rateLimit } from "../lib/rateLimit.js";
 import { readVisitor } from "../lib/visitor.js";
 import { readJson, SETTINGS_FILE } from "../lib/storage.js";
-import { startRun, startUrlRun, stepRun, generateManifest, getRun } from "../lib/speedrun.js";
+import { startRun, startUrlRun, startPasteRun, stepRun, generateManifest, getRun } from "../lib/speedrun.js";
 import { pickHybridRecording } from "../lib/recordings.js";
 import {
   UrlValidationError,
@@ -17,6 +17,7 @@ import {
   FetchTimeoutError,
   TooLargeError,
   FetchError,
+  TargetBlockedError,
   RateLimitError,
   hostnameForLog,
 } from "../lib/urlFetcher.js";
@@ -136,6 +137,12 @@ function urlErrorToResponse(err) {
   }
   if (err instanceof TooLargeError) {
     return { status: 413, body: { error: "URL response too large", code: "TOO_LARGE" } };
+  }
+  if (err instanceof TargetBlockedError) {
+    // Upstream bot wall (LinkedIn authwall et al.) — the fetch itself is
+    // refused for any server-side client. 403 with its own code so the
+    // frontend can explain it distinctly from our SSRF guard.
+    return { status: 403, body: { error: err.message, code: "TARGET_BLOCKED" } };
   }
   if (err instanceof FetchError) {
     return { status: 502, body: { error: "Could not fetch URL", code: "FETCH_FAILED" } };
@@ -342,6 +349,69 @@ router.post("/url/start", ash(async (req, res) => {
     if (status >= 500) {
       console.warn(`[speedrun/url/start] ${status} for host=${host} code=${body.code}`);
     }
+    return res.status(status).json(body);
+  }
+}));
+
+// =====================================================================
+// POST /api/speedrun/paste/start — paste mode for walled pages
+// (LinkedIn, Instagram, …): the visitor pastes the content they can see
+// in their own browser; the Observer explores that text.
+// =====================================================================
+router.post("/paste/start", ash(async (req, res) => {
+  const { text, title } = req.body || {};
+  if (typeof text !== "string" || text.trim().length < 80) {
+    return res.status(400).json({
+      error: "text is required (at least 80 characters — paste real page/profile content)",
+      code: "INVALID_PASTE",
+    });
+  }
+  if (text.length > 20_000) {
+    return res.status(400).json({ error: "text too long (20k characters max)", code: "INVALID_PASTE" });
+  }
+  if (title !== undefined && (typeof title !== "string" || title.length > 120)) {
+    return res.status(400).json({ error: "title must be a string of at most 120 characters" });
+  }
+
+  const { visitorApiKey, blocked } = await resolveMode(req);
+  if (blocked && blocked.status === 429) {
+    res.set("Retry-After", String(blocked.body.retryAfterSec));
+    return res.status(blocked.status).json(blocked.body);
+  }
+
+  // Same start limiter bucket as /url/start: paste runs cost the same LLM
+  // narration (and later replay traffic) as URL runs.
+  const rl = rateLimit({
+    key: `speedrun-url-start:${req.ip}`,
+    limit: URL_START_LIMIT_PER_HOUR,
+    windowMs: HOUR_MS,
+  });
+  if (!rl.allowed) {
+    res.set("Retry-After", String(Math.ceil(rl.retryAfterMs / 1000)));
+    return res.status(429).json({
+      error: "Too many URL speedruns",
+      retryAfterSec: Math.ceil(rl.retryAfterMs / 1000),
+      code: "RATE_LIMIT",
+    });
+  }
+
+  // No fetch happens here, so the hybrid-disabled gate can fire directly.
+  if (!visitorApiKey && !process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({
+      error: "Hybrid mode disabled. Add your API key to start.",
+      hybridDisabled: true,
+    });
+  }
+
+  try {
+    const { runId, initialState } = await startPasteRun({
+      text,
+      title: typeof title === "string" && title.trim() ? title.trim() : undefined,
+      visitorApiKey,
+    });
+    return res.status(201).json({ runId, initialState });
+  } catch (err) {
+    const { status, body } = urlErrorToResponse(err);
     return res.status(status).json(body);
   }
 }));

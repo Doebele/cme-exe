@@ -123,7 +123,7 @@ export default function ThoughtStream({
         >
           <div className="flex items-center gap-1.5">
             <h3
-              className="font-display text-[0.55rem] uppercase tracking-[0.2em] crt-glow"
+              className="font-display text-[0.65rem] uppercase tracking-[0.2em] crt-glow"
               style={{ color: "var(--color-text-primary)" }}
             >
               {label}
@@ -131,7 +131,7 @@ export default function ThoughtStream({
             {isRecording && <RecordingBadge />}
           </div>
           {isLive && (
-            <span className="flex items-center gap-1 font-display text-[0.5rem] uppercase tracking-[0.15em] text-text-secondary">
+            <span className="flex items-center gap-1 font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary">
               <span
                 className="speedrun-pulse-dot"
                 style={{
@@ -195,7 +195,7 @@ export default function ThoughtStream({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <h3
-                className="font-display text-[0.6rem] uppercase tracking-[0.2em] crt-glow"
+                className="font-display text-[0.65rem] uppercase tracking-[0.2em] crt-glow"
                 style={{ color: "var(--color-text-primary)" }}
               >
                 {label}
@@ -203,7 +203,7 @@ export default function ThoughtStream({
               {isRecording && <RecordingBadge />}
             </div>
             {isLive && (
-              <span className="flex items-center gap-1.5 font-display text-[0.55rem] uppercase tracking-[0.15em] text-text-secondary">
+              <span className="flex items-center gap-1.5 font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary">
                 <span
                   className="speedrun-pulse-dot"
                   style={{
@@ -240,7 +240,7 @@ export default function ThoughtStream({
             </p>
           )}
           {current && (
-            <p className="font-display text-[0.55rem] uppercase tracking-[0.2em] text-text-secondary/60">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/60">
               step {current.step} · {current.action.type}
               {current.action.target ? ` → ${current.action.target}` : ""}
             </p>
@@ -265,7 +265,7 @@ export default function ThoughtStream({
           {isRecording && <RecordingBadge />}
         </div>
         {isLive && (
-          <span className="flex items-center gap-1.5 font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary">
+          <span className="flex items-center gap-1.5 font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary">
             <span
               className="speedrun-pulse-dot"
               style={{
@@ -308,7 +308,7 @@ export default function ThoughtStream({
           </p>
         )}
         {current && (
-          <p className="mt-2 font-display text-[0.6rem] uppercase tracking-[0.2em] text-text-secondary/60">
+          <p className="mt-2 font-display text-[0.65rem] uppercase tracking-[0.2em] text-text-secondary/60">
             step {current.step} · {current.action.type}
             {current.action.target ? ` → ${current.action.target}` : ""}
             {current.action.item ? ` · ${current.action.item}` : ""}
@@ -336,7 +336,7 @@ export default function ThoughtStream({
               <p className="text-[0.85em] leading-snug text-text-secondary/70">
                 {t.thought}
               </p>
-              <p className="mt-0.5 font-display text-[0.55rem] uppercase tracking-[0.15em] text-text-secondary/40">
+              <p className="mt-0.5 font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/40">
                 step {t.step}
               </p>
             </div>

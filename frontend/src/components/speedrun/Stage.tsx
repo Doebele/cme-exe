@@ -102,6 +102,9 @@ interface UrlStageProps extends StageBaseProps {
   subject: ExternalSubject;
   sections: ExternalSection[];
   sourceUrl: string;
+  /** Provenance of the content: live fetch, Wayback snapshot, or paste. */
+  origin?: "external" | "archive" | "paste" | null;
+  archivedAt?: string | null;
 }
 
 type StageProps = ClausStageProps | UrlStageProps;
@@ -199,9 +202,18 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
       .filter((img): img is ExternalImage & { ascii: string } => !!img.ascii)
       .sort((a, b) => (kindOrder[a.kind] ?? 99) - (kindOrder[b.kind] ?? 99))
       .slice(0, 3);
+    const flavor = sourceFlavor(props.sourceUrl, props.origin);
+    // Social flavors always get a pixel identity block — converted ascii if
+    // the source had images, otherwise a deterministic procedural tile.
+    const heroVisual =
+      asciiImages.length > 0
+        ? asciiImages[0]
+        : flavor.social || flavor.key === "archive"
+          ? { ascii: undefined, alt: flavor.badge ? `source: ${flavor.key}` : "source", kind: "avatar" as const }
+          : null;
 
     return (
-      <StageShell ref={ref} compact={compact} sourceUrl={props.sourceUrl}>
+      <StageShell ref={ref} compact={compact} sourceUrl={props.sourceUrl} origin={props.origin} archivedAt={props.archivedAt}>
         {/* Hero + About (left column, top) */}
         <div className="flex flex-col gap-4 md:row-span-1 md:col-span-1">
           <div
@@ -210,19 +222,28 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
             className="speedrun-station rounded-sm border p-4 md:p-5 flex flex-col justify-center"
             style={{ borderColor: BASE_BORDER, ...stationStyle(heroLoc, "hero") }}
           >
-            <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary flex items-center gap-2">
+              {/* source-flavor monogram */}
+              {flavor.badge && (
+                <span
+                  className="inline-flex items-center justify-center font-display"
+                  style={{
+                    minWidth: "1.1rem",
+                    padding: "0 0.2rem",
+                    border: "1px solid color-mix(in srgb, var(--color-accent-secondary) 50%, transparent)",
+                    color: "var(--color-accent-secondary)",
+                    fontSize: "0.5rem",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {flavor.badge}
+                </span>
+              )}
               // hero
             </p>
-            {asciiImages.length > 0 && (
+            {heroVisual && (
               <div className="flex flex-col gap-1.5 mt-1 mb-1">
-                {asciiImages.map((img, i) => (
-                  <div key={i}>
-                    <pre className="stage-ascii">{img.ascii}</pre>
-                    <p className="font-display text-[0.5rem] uppercase tracking-[0.15em] text-text-secondary/60">
-                      {img.alt || img.kind}
-                    </p>
-                  </div>
-                ))}
+                <AsciiVisual ascii={heroVisual.ascii} seed={heroName} alt={heroVisual.alt} />
               </div>
             )}
             <p className="font-display text-lg md:text-xl leading-tight crt-glow mt-1 break-words">
@@ -234,7 +255,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
               </p>
             )}
             {heroLocation && (
-              <p className="font-display text-[0.6rem] text-text-secondary/70 mt-0.5">
+              <p className="font-display text-[0.65rem] text-text-secondary/70 mt-0.5">
                 {heroLocation}
               </p>
             )}
@@ -246,7 +267,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
             className="speedrun-station rounded-sm border p-3 md:p-4"
             style={{ borderColor: BASE_BORDER, ...stationStyle(aboutLoc, "about") }}
           >
-            <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary">
               // about
             </p>
             <p className="text-xs md:text-sm text-text-secondary mt-1 leading-snug break-words">
@@ -257,8 +278,8 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
 
         {/* Works (top-right) */}
         <div className="md:col-span-1 md:row-span-2">
-          <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
-            // {findUrlSection("works")?.title || "works"}
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+            // {flavor.social ? flavor.worksLabel : (findUrlSection("works")?.title || "works")}
           </p>
           {worksItems.length === 0 ? (
             <EmptyHint />
@@ -269,6 +290,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
                   key={it.id}
                   item={it}
                   stationStyle={stationStyle}
+                  pixelSeed={flavor.social ? it.id + it.title : undefined}
                 />
               ))}
             </div>
@@ -278,7 +300,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
         {/* Career (left-bottom) — omitted entirely when absent in URL mode */}
         {careerItems.length > 0 && (
           <div className="md:col-span-1 md:row-span-1">
-            <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
               // {findUrlSection("career")?.title || "career"}
             </p>
             <div className="flex flex-col gap-1.5">
@@ -307,8 +329,8 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
 
         {/* Skills (bottom, full width) */}
         <div className="md:col-span-2 md:row-span-1">
-          <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
-            // {findUrlSection("skills")?.title || "skills"}
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+            // {flavor.social ? flavor.skillsLabel : (findUrlSection("skills")?.title || "skills")}
           </p>
           {skillsItems.length === 0 ? (
             <EmptyHint />
@@ -355,7 +377,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
           className="speedrun-station rounded-sm border p-4 md:p-5 flex flex-col justify-center"
           style={{ borderColor: BASE_BORDER, ...stationStyle(heroLoc, "hero") }}
         >
-          <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary">
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary">
             // hero
           </p>
           <p className="font-display text-lg md:text-xl leading-tight crt-glow mt-1">
@@ -372,7 +394,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
           className="speedrun-station rounded-sm border p-3 md:p-4"
           style={{ borderColor: BASE_BORDER, ...stationStyle(aboutLoc, "about") }}
         >
-          <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary">
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary">
             // about
           </p>
           <p className="text-xs md:text-sm text-text-secondary mt-1 leading-snug">
@@ -384,7 +406,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
 
       {/* Works (top-right) */}
       <div className="md:col-span-1 md:row-span-2">
-        <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+        <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
           // works
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2 md:gap-3">
@@ -398,13 +420,13 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
                 className="speedrun-station rounded-sm border p-2 md:p-3 flex flex-col"
                 style={{ borderColor: BASE_BORDER, ...stationStyle(loc, "works") }}
               >
-                <p className="font-display text-[0.6rem] text-text-secondary/80">
+                <p className="font-display text-[0.65rem] text-text-secondary/80">
                   {w.year}
                 </p>
                 <p className="font-display text-[0.7rem] md:text-xs leading-tight mt-0.5 line-clamp-2">
                   {w.title}
                 </p>
-                <p className="text-[0.55rem] md:text-[0.6rem] text-text-secondary/70 mt-1 line-clamp-1">
+                <p className="text-[0.65rem] md:text-[0.65rem] text-text-secondary/70 mt-1 line-clamp-1">
                   {w.category}
                 </p>
               </div>
@@ -415,7 +437,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
 
       {/* Career (left-bottom) */}
       <div className="md:col-span-1 md:row-span-1">
-        <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+        <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
           // career
         </p>
         <div className="flex flex-col gap-1.5">
@@ -430,13 +452,13 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
                 className="speedrun-station rounded-sm border px-2 py-1 flex items-center gap-2"
                 style={{ borderColor: BASE_BORDER, ...stationStyle(loc, "career") }}
               >
-                <span className="font-display text-[0.6rem] text-text-secondary/80 w-9 shrink-0">
+                <span className="font-display text-[0.65rem] text-text-secondary/80 w-9 shrink-0">
                   {c.year}
                 </span>
                 <span className="font-display text-[0.65rem] md:text-xs leading-tight truncate">
                   {c.title}
                 </span>
-                <span className="text-[0.55rem] text-text-secondary/60 truncate hidden sm:inline">
+                <span className="text-[0.65rem] text-text-secondary/60 truncate hidden sm:inline">
                   {c.company}
                 </span>
               </div>
@@ -447,7 +469,7 @@ const Stage = forwardRef<HTMLDivElement, StageProps>(function Stage(props, ref) 
 
       {/* Skills (bottom, full width) */}
       <div className="md:col-span-2 md:row-span-1">
-        <p className="font-display text-[0.6rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
+        <p className="font-display text-[0.65rem] uppercase tracking-[0.25em] text-text-secondary mb-2">
           // skills
         </p>
         <div className="flex flex-wrap gap-2">
@@ -486,8 +508,16 @@ const StageShell = forwardRef<
     children: React.ReactNode;
     compact?: boolean;
     sourceUrl?: string;
+    origin?: "external" | "archive" | "paste" | null;
+    archivedAt?: string | null;
   }
->(function StageShell({ children, compact = false, sourceUrl }, ref) {
+>(function StageShell({ children, compact = false, sourceUrl, origin, archivedAt }, ref) {
+  const originNote =
+    origin === "archive"
+      ? `◧ WEB ARCHIVE${archivedAt ? ` · ${archivedAt}` : ""}`
+      : origin === "paste"
+        ? "◧ PASTED CONTENT"
+        : null;
   return (
     <div
       ref={ref}
@@ -505,18 +535,19 @@ const StageShell = forwardRef<
         }}
       />
 
-      {sourceUrl && (
+      {(sourceUrl || originNote) && (
         <div
-          className="absolute top-2 right-2 z-30 max-w-[60%] font-display text-[0.55rem] uppercase tracking-[0.15em] px-2 py-0.5 border truncate"
+          className="absolute top-2 right-2 z-30 max-w-[60%] font-display text-[0.65rem] uppercase tracking-[0.15em] px-2 py-0.5 border truncate"
           style={{
             borderColor:
               "color-mix(in srgb, var(--color-accent-secondary) 50%, transparent)",
             color: "var(--color-accent-secondary)",
             backgroundColor: "color-mix(in srgb, var(--color-bg) 70%, transparent)",
           }}
-          title={sourceUrl}
+          title={sourceUrl || originNote || undefined}
         >
-          URL: {sourceUrl}
+          {sourceUrl ? `URL: ${sourceUrl}` : originNote}
+          {sourceUrl && originNote ? ` · ${originNote}` : ""}
         </div>
       )}
 
@@ -537,23 +568,31 @@ const StageShell = forwardRef<
 function UrlWorkCard({
   item,
   stationStyle,
+  pixelSeed,
 }: {
   item: ExternalItem;
   stationStyle: (loc: StationLocation, section: Section) => React.CSSProperties;
+  /** When set, renders a small deterministic pixel tile (social flavors). */
+  pixelSeed?: string;
 }) {
   const loc: StationLocation = { section: "works", item: item.id };
   return (
     <div
       data-section="works"
       data-item={item.id}
-      className="speedrun-station rounded-sm border p-2 md:p-3 flex flex-col"
+      className="speedrun-station rounded-sm border p-2 md:p-3 flex flex-col gap-1.5"
       style={{ borderColor: BASE_BORDER, ...stationStyle(loc, "works") }}
     >
+      {pixelSeed && (
+        <pre className="stage-pixel-tile" aria-hidden>
+          {pixelTile(pixelSeed, 4, 22)}
+        </pre>
+      )}
       <p className="font-display text-[0.7rem] md:text-xs leading-tight line-clamp-2">
         {item.title}
       </p>
       {item.description && (
-        <p className="text-[0.55rem] md:text-[0.6rem] text-text-secondary/70 mt-1 line-clamp-1">
+        <p className="text-[0.65rem] md:text-[0.65rem] text-text-secondary/70 mt-1 line-clamp-1">
           {item.description}
         </p>
       )}
@@ -561,9 +600,117 @@ function UrlWorkCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// ASCII visuals + source flavor
+// ---------------------------------------------------------------------------
+
+/** Deterministic 32-bit hash so tiles are stable across renders/replays. */
+function hashSeed(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Block-density ramp used for the pixel tiles. */
+const TILE_CHARS = " .░▒▓█";
+
+/**
+ * Procedural "pixel" tile: a deterministic block-glyph pattern seeded from a
+ * string. Gives every station an ASCII/pixel identity even when the source
+ * page exposed no images to convert.
+ */
+function pixelTile(seed: string, rows: number, cols: number): string {
+  let x = hashSeed(seed) || 1;
+  const rand = () => {
+    // xorshift32 — deterministic, cheap, good enough for visual noise
+    x ^= x << 13; x >>>= 0;
+    x ^= x >> 17;
+    x ^= x << 5; x >>>= 0;
+    return x / 4294967296;
+  };
+  const lines: string[] = [];
+  for (let r = 0; r < rows; r++) {
+    let line = "";
+    for (let c = 0; c < cols; c++) {
+      const v = rand();
+      // Bias toward mid densities so tiles read as texture, not noise.
+      const idx = Math.min(TILE_CHARS.length - 1, Math.floor(v * v * TILE_CHARS.length));
+      line += TILE_CHARS[idx];
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * ASCII image block with a decode-style reveal: the pre scales in while a
+ * scanline bar sweeps across it once. Falls back to a procedural pixel tile
+ * when no converted ascii exists.
+ */
+function AsciiVisual({ ascii, seed, alt }: { ascii?: string; seed: string; alt?: string }) {
+  const text = ascii && ascii.trim() ? ascii : pixelTile(seed, 10, 30);
+  return (
+    <div className="stage-ascii-wrap">
+      <pre className="stage-ascii stage-ascii--reveal">{text}</pre>
+      <span className="stage-ascii-sweep" aria-hidden />
+      {alt && (
+        <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/60 mt-0.5">
+          {alt}
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface SourceFlavor {
+  key: string;
+  badge: string;
+  worksLabel: string;
+  skillsLabel: string;
+  /** Social profile flavors get pixel tiles + profile-style labels. */
+  social: boolean;
+}
+
+/**
+ * Presentation flavor derived from the run's source. The extracted content
+ * shape is identical for every origin — the flavor varies how the stage
+ * *reads*: section labels (feed/posts/roles), monogram badges, and pixel
+ * imagery for the walled social sites.
+ */
+function sourceFlavor(sourceUrl: string | null | undefined, origin?: string | null): SourceFlavor {
+  let host = "";
+  try {
+    host = sourceUrl ? new URL(sourceUrl).hostname.replace(/^www\./, "") : "";
+  } catch {
+    host = "";
+  }
+  if (origin === "paste") {
+    return { key: "paste", badge: "⧉", worksLabel: "profile", skillsLabel: "tags", social: true };
+  }
+  if (host.endsWith("instagram.com")) {
+    return { key: "instagram", badge: "IG", worksLabel: "feed", skillsLabel: "tags", social: true };
+  }
+  if (host.endsWith("facebook.com") || host === "fb.com") {
+    return { key: "facebook", badge: "FB", worksLabel: "posts", skillsLabel: "tags", social: true };
+  }
+  if (host.endsWith("linkedin.com") || host === "lnkd.in") {
+    return { key: "linkedin", badge: "IN", worksLabel: "roles", skillsLabel: "skills", social: true };
+  }
+  if (host.endsWith("wikipedia.org")) {
+    return { key: "wikipedia", badge: "W", worksLabel: "sections", skillsLabel: "see also", social: false };
+  }
+  if (origin === "archive") {
+    return { key: "archive", badge: "◧", worksLabel: "archives", skillsLabel: "tags", social: false };
+  }
+  return { key: "generic", badge: "", worksLabel: "works", skillsLabel: "skills", social: false };
+}
+
 function EmptyHint() {
   return (
-    <p className="font-display text-[0.6rem] uppercase tracking-[0.15em] text-text-secondary/40 italic">
+    <p className="font-display text-[0.65rem] uppercase tracking-[0.15em] text-text-secondary/40 italic">
       (nothing extracted)
     </p>
   );

@@ -8,6 +8,7 @@ import {
   getRun,
   startSpeedrun,
   startUrlSpeedrun,
+  startPasteSpeedrun,
   stepSpeedrun,
   stepUrlSpeedrun,
 } from "../lib/speedrunApi";
@@ -63,10 +64,17 @@ export interface UseSpeedrun {
   urlSubject: ExternalSubject | null;
   urlSections: ExternalSection[];
   urlSourceUrl: string | null;
+  /** How the current URL-run's content was obtained (live/archive/paste). */
+  urlOrigin: "external" | "archive" | "paste" | null;
+  /** Wayback snapshot date when urlOrigin === "archive". */
+  urlArchivedAt: string | null;
+  /** True when the target site's bot wall blocked the run (paste mode CTA). */
+  blockedByTarget: boolean;
   isRecording: boolean;
   recordingId: string | null;
   start: () => Promise<void>;
   startWithUrl: (url: string) => Promise<void>;
+  startWithPaste: (text: string, title?: string) => Promise<void>;
   replay: (runId: string) => Promise<void>;
   replayRecording: (recordingId: string) => Promise<void>;
   share: () => Promise<string>;
@@ -142,6 +150,10 @@ function messageForUrlError(err: unknown): string {
         return "That doesn't look like a valid URL. Try a public one (https://...).";
       case "BLOCKED":
         return "The Observer can't reach that URL — it's on a private network.";
+      case "TARGET_BLOCKED":
+        return err.body.error?.includes("LinkedIn")
+          ? "LinkedIn locks profiles behind a bot wall (authwall) — the Observer can't read them. Try a regular public page."
+          : "That site blocks automated visitors — the Observer can't read it. Try a regular public page.";
       case "TIMEOUT":
         return "The URL took too long to respond.";
       case "TOO_LARGE":
@@ -163,15 +175,25 @@ function messageForUrlError(err: unknown): string {
 }
 
 /**
- * Normalize the externalPageState on a run record into the {subject, sections}
- * pair the Stage consumes. Returns null when the record lacks URL data.
+ * Normalize the externalPageState on a run record into the pair the Stage
+ * consumes. Returns null when the record lacks URL data.
  */
 function extractUrlState(
   page: ExternalPageState | undefined,
-): { subject: ExternalSubject; sections: ExternalSection[] } | null {
+): {
+  subject: ExternalSubject;
+  sections: ExternalSection[];
+  origin: "external" | "archive" | "paste" | null;
+  archivedAt: string | null;
+} | null {
   if (!page || !page.subject) return null;
   const sections = Array.isArray(page.sections) ? page.sections : [];
-  return { subject: page.subject, sections };
+  return {
+    subject: page.subject,
+    sections,
+    origin: page.origin ?? (page.source === "paste" ? "paste" : "external"),
+    archivedAt: page.archivedAt ?? null,
+  };
 }
 
 /**
@@ -227,6 +249,9 @@ export function useSpeedrun(): UseSpeedrun {
   const [urlSubject, setUrlSubject] = useState<ExternalSubject | null>(null);
   const [urlSections, setUrlSections] = useState<ExternalSection[]>([]);
   const [urlSourceUrl, setUrlSourceUrl] = useState<string | null>(null);
+  const [urlOrigin, setUrlOrigin] = useState<"external" | "archive" | "paste" | null>(null);
+  const [urlArchivedAt, setUrlArchivedAt] = useState<string | null>(null);
+  const [blockedByTarget, setBlockedByTarget] = useState(false);
 
   // Cancellation guard: each start()/startWithUrl()/replay() increments this;
   // async work checks it before committing state so a stale loop can't
@@ -270,6 +295,9 @@ export function useSpeedrun(): UseSpeedrun {
     setUrlSubject(null);
     setUrlSections([]);
     setUrlSourceUrl(null);
+    setUrlOrigin(null);
+    setUrlArchivedAt(null);
+    setBlockedByTarget(false);
   }, []);
 
   /**
@@ -514,6 +542,7 @@ export function useSpeedrun(): UseSpeedrun {
       setError(null);
       setHybridDisabled(false);
       setRateLimited(false);
+      setBlockedByTarget(false);
       setManifest(null);
       setThoughts([]);
       setCurrentLocation(INITIAL_LOCATION);
@@ -521,6 +550,8 @@ export function useSpeedrun(): UseSpeedrun {
       setUrlSubject(null);
       setUrlSections([]);
       setUrlSourceUrl(null);
+      setUrlOrigin(null);
+      setUrlArchivedAt(null);
 
       const visitorApiKey = resolveVisitorKey();
 
@@ -531,6 +562,8 @@ export function useSpeedrun(): UseSpeedrun {
         startedRunId = startRes.runId;
         setRunId(startedRunId);
         setUrlSourceUrl(startRes.initialState.sourceUrl);
+        setUrlOrigin(startRes.initialState.origin ?? "external");
+        setUrlArchivedAt(startRes.initialState.archivedAt ?? null);
 
         // /url/start returns subject + flat ids; the rich titles/descriptions
         // live on the run record's externalPageState. Fetch it so the Stage
@@ -541,6 +574,8 @@ export function useSpeedrun(): UseSpeedrun {
         if (ext) {
           setUrlSubject(ext.subject);
           setUrlSections(ext.sections);
+          setUrlOrigin(ext.origin);
+          setUrlArchivedAt(ext.archivedAt);
         } else {
           setUrlSubject(startRes.initialState.subject);
           setUrlSections([]);
@@ -559,7 +594,106 @@ export function useSpeedrun(): UseSpeedrun {
           setRateLimited(true);
           setError(messageForUrlError(err));
         } else {
+          if (httpErr && httpErr.body.code === "TARGET_BLOCKED") {
+            setBlockedByTarget(true);
+          }
           setError(messageForUrlError(err));
+        }
+        setStatus("error");
+        return;
+      }
+
+      setStatus("running");
+
+      await runStepLoop(token, controller, startedRunId, visitorApiKey, stepUrlSpeedrun);
+      if (runTokenRef.current !== token || controller.signal.aborted) return;
+
+      setStatus("manifest");
+      if (controller.signal.aborted) return;
+      try {
+        const manifestRes = await getManifestForUrl(startedRunId, visitorApiKey);
+        if (runTokenRef.current !== token || controller.signal.aborted) return;
+        setManifest(manifestRes.manifest);
+      } catch (err) {
+        if (runTokenRef.current !== token || controller.signal.aborted) return;
+        if (err instanceof SpeedrunHttpError && err.body.manifest) {
+          setManifest(err.body.manifest);
+        } else if (err instanceof SpeedrunHttpError && err.status === 404) {
+          setError("This run has expired (24h TTL).");
+          setStatus("error");
+        } else {
+          setError(messageForError(err));
+          setStatus("error");
+        }
+      }
+    },
+    [runStepLoop],
+  );
+
+  /**
+   * Paste mode: the visitor pasted content from a page their own browser CAN
+   * see (LinkedIn, Instagram, …). Shares the URL-run lifecycle; only the
+   * start call differs.
+   */
+  const startWithPaste = useCallback(
+    async (text: string, title?: string) => {
+      runTokenRef.current += 1;
+      const token = runTokenRef.current;
+      activeRunRef.current?.abort();
+      const controller = new AbortController();
+      activeRunRef.current = controller;
+
+      setStatus("starting");
+      setMode("url");
+      setError(null);
+      setHybridDisabled(false);
+      setRateLimited(false);
+      setBlockedByTarget(false);
+      setManifest(null);
+      setThoughts([]);
+      setCurrentLocation(INITIAL_LOCATION);
+      setCurrentStep(0);
+      setUrlSubject(null);
+      setUrlSections([]);
+      setUrlSourceUrl(null);
+      setUrlOrigin("paste");
+      setUrlArchivedAt(null);
+
+      const visitorApiKey = resolveVisitorKey();
+
+      let startedRunId: string;
+      try {
+        const startRes = await startPasteSpeedrun(text, title, visitorApiKey);
+        if (runTokenRef.current !== token || controller.signal.aborted) return;
+        startedRunId = startRes.runId;
+        setRunId(startedRunId);
+
+        const run = await getRun(startedRunId);
+        if (runTokenRef.current !== token || controller.signal.aborted) return;
+        const ext = extractUrlState(run.externalPageState);
+        if (ext) {
+          setUrlSubject(ext.subject);
+          setUrlSections(ext.sections);
+          setUrlOrigin(ext.origin);
+        } else {
+          setUrlSubject(startRes.initialState.subject);
+          setUrlSections([]);
+        }
+        setCurrentLocation({
+          section: startRes.initialState.section,
+          item: startRes.initialState.item,
+        });
+      } catch (err) {
+        if (runTokenRef.current !== token || controller.signal.aborted) return;
+        const httpErr = err instanceof SpeedrunHttpError ? err : null;
+        if (httpErr && httpErr.status === 503 && httpErr.body.hybridDisabled) {
+          setHybridDisabled(true);
+          setError("Hybrid mode disabled. Add your API key (top right) to start.");
+        } else if (httpErr && httpErr.body.code === "RATE_LIMIT") {
+          setRateLimited(true);
+          setError(messageForUrlError(err));
+        } else {
+          setError(messageForError(err));
         }
         setStatus("error");
         return;
@@ -629,6 +763,8 @@ export function useSpeedrun(): UseSpeedrun {
         if (ext) {
           setUrlSubject(ext.subject);
           setUrlSections(ext.sections);
+          setUrlOrigin(ext.origin);
+          setUrlArchivedAt(ext.archivedAt);
         }
         if (run.sourceUrl) setUrlSourceUrl(run.sourceUrl);
       } else {
@@ -636,6 +772,8 @@ export function useSpeedrun(): UseSpeedrun {
         setUrlSubject(null);
         setUrlSections([]);
         setUrlSourceUrl(null);
+        setUrlOrigin(null);
+        setUrlArchivedAt(null);
       }
 
       setStatus("replay");
@@ -750,8 +888,12 @@ export function useSpeedrun(): UseSpeedrun {
     urlSubject,
     urlSections,
     urlSourceUrl,
+    urlOrigin,
+    urlArchivedAt,
+    blockedByTarget,
     start,
     startWithUrl,
+    startWithPaste,
     replay,
     replayRecording,
     share,

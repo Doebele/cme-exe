@@ -101,7 +101,9 @@ export interface ExternalSection {
 }
 
 export interface ExternalPageState {
-  source: "external";
+  source: "external" | "paste";
+  origin?: "external" | "archive" | "paste";
+  archivedAt?: string;
   sourceUrl: string;
   finalUrl?: string;
   title?: string;
@@ -114,8 +116,12 @@ export interface UrlStartResponse {
   runId: string;
   initialState: {
     kind: "url-speedrun";
-    sourceUrl: string;
-    sourceHost?: string;
+    /** How the content was obtained: live fetch, Wayback snapshot, paste. */
+    origin?: "external" | "archive" | "paste";
+    /** Snapshot date (YYYY-MM-DD) when origin === "archive". */
+    archivedAt?: string | null;
+    sourceUrl: string | null;
+    sourceHost?: string | null;
     section: Section;
     item: string | null;
     subject: ExternalSubject;
@@ -185,6 +191,7 @@ export interface RecordingPatchBody {
 export type UrlErrorCode =
   | "INVALID_URL"
   | "BLOCKED"
+  | "TARGET_BLOCKED"
   | "TIMEOUT"
   | "TOO_LARGE"
   | "FETCH_FAILED"
@@ -328,6 +335,22 @@ export function startUrlSpeedrun(
   return postJson<UrlStartResponse>(
     `${SPEEDRUN_BASE}/url/start`,
     { url, visitorApiKey: visitorApiKey ?? null },
+    visitorApiKey,
+  );
+}
+
+/**
+ * Start a paste-mode run: content the visitor pasted (for walled pages like
+ * LinkedIn). Shares the URL-speedrun lifecycle.
+ */
+export function startPasteSpeedrun(
+  text: string,
+  title?: string,
+  visitorApiKey?: string | null,
+): Promise<UrlStartResponse> {
+  return postJson<UrlStartResponse>(
+    `${SPEEDRUN_BASE}/paste/start`,
+    { text, title: title ?? null, visitorApiKey: visitorApiKey ?? null },
     visitorApiKey,
   );
 }

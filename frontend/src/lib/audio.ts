@@ -327,8 +327,11 @@ export function subscribe(cb: (enabled: boolean) => void): () => void {
  *          many 80-120ms bursts between 1500-2800 Hz, staggered every ~120ms
  *   4.50s  rate negotiation: descending chirp (2600→600 Hz, 0.3s)
  *   4.90s  more bursts + bandpass noise
- *   5.40s  final confirm (980 Hz, 0.3s) — "connection established"
- *   5.80s  silence
+ *   5.40s  two-tone "twang" + settle thump — CONNECT 56000
+ *   5.66s  data-mode carrier hiss fades in (band-passed white noise)
+ *   5.85-6.55s  crackle tick per LOADING / LINK / THEME line (text sync)
+ *   7.00s  carrier release fade (PRESS ANY KEY TO ENTER appears ~6.85s)
+ *   7.55s  line-drop click, silence
  */
 export function playBootSound(): void {
   if (!state.enabled) return;
@@ -400,47 +403,52 @@ export function playBootSound(): void {
     return noise;
   };
 
-  // ---- Phase 1: pickup + line hiss --------------------------------------
+  // ---- Phase 1: pickup + line hiss (matches "INITIALIZING MODEM" 0.45s) --
 
-  noiseBurst(0.0, 0.04, 700, -22);
+  noiseBurst(0.45, 0.04, 700, -22);
   const lineNoise = new Tone.Noise("pink");
   lineNoise.volume.value = -32;
   lineNoise.connect(masterGain);
-  lineNoise.start(now + 0.05);
-  lineNoise.stop(now + 0.45);
+  lineNoise.start(now + 0.5);
+  lineNoise.stop(now + 0.9);
 
-  // ---- Phase 2: ring-back chord (440 + 480 Hz, 0.4s on / 0.2s off) ------
+  // ---- Phase 2: ring-back chord (BIOS "RING ... 440+480 HZ" at 1.1s) ----
 
-  // Two ring cycles — the iconic "brrrr-brrrr" cadence.
-  chord([440, 480], 0.45, 0.4, "sine", -12);
+  // Two ring cycles — the iconic "brrrr-brrrr" cadence, first one landing on
+  // the RING line.
   chord([440, 480], 1.05, 0.4, "sine", -12);
+  chord([440, 480], 1.7, 0.4, "sine", -12);
 
-  // Brief silence + pickup click after second ring.
-  noiseBurst(1.85, 0.03, 1200, -22);
+  // Brief silence + pickup click after second ring ("DIALING" settles).
+  noiseBurst(2.0, 0.03, 1200, -22);
 
-  // ---- Phase 3: CED answer tone (2100 Hz) -------------------------------
+  // ---- Phase 3: CED answer tone (BIOS "CARRIER DETECTED 2100 HZ" 2.15s) --
 
   // The answering modem's "I'm here" tone. Slight attack wobble.
-  const ced = tone(2100, 2.1, 0.55, "sine", -6);
-  ced.frequency.setValueAtTime(2050, now + 2.1);
-  ced.frequency.linearRampToValueAtTime(2100, now + 2.2);
+  const ced = tone(2100, 2.15, 0.55, "sine", -6);
+  ced.frequency.setValueAtTime(2050, now + 2.15);
+  ced.frequency.linearRampToValueAtTime(2100, now + 2.25);
 
   // Silence between CED and training (the "are you there?" pause).
-  // (intentionally no sound 2.65-3.10)
+  // (intentionally no sound 2.7-3.15)
 
   // ---- Phase 4: training plinks (the iconic part) -----------------------
   //
-  // Many short high-frequency bursts at staggered offsets. Real modems
-  // negotiate line quality via rapid tone exchanges — the famous
-  // "plink-plink-plink-plink" that everyone remembers.
+  // The first four plinks land EXACTLY on the BIOS PROBE A–D lines
+  // (1850/2250/2400/1650 Hz at 3.15/3.35/3.55/3.75s); the rest continue as
+  // the rapid random exchange everyone remembers.
 
-  // 1.5s of dense plinks with frequency variation.
+  const probeFreqs = [1850, 2250, 2400, 1650];
+  probeFreqs.forEach((f, i) => {
+    tone(f, 3.15 + i * 0.2, 0.09, "square", -16);
+    tone(f * 0.66, 3.15 + i * 0.2, 0.09, "sine", -22);
+  });
+
   const plinkFreqs = [
-    1850, 2250, 2400, 1650, 2750,
-    2400, 2000, 2600, 1750, 2250,
-    2800, 2150, 1850, 2400, 1650,
+    2750, 2400, 2000, 2600, 1750,
+    2250, 2800, 2150, 1850, 2400, 1650,
   ];
-  let plinkT = 3.10;
+  let plinkT = 3.95;
   for (const f of plinkFreqs) {
     // Shorter at start, slightly longer toward the end.
     const dur = 0.07 + Math.random() * 0.04;
@@ -453,34 +461,79 @@ export function playBootSound(): void {
   }
 
   // Bandpass noise sweeps during training — the "sshk-sshk-sshk".
-  noiseBurst(3.30, 0.15, 1800, -20, "bandpass", 4);
-  noiseBurst(3.80, 0.20, 2200, -20, "bandpass", 4);
-  noiseBurst(4.20, 0.18, 1500, -20, "bandpass", 4);
+  noiseBurst(3.35, 0.15, 1800, -20, "bandpass", 4);
+  noiseBurst(3.85, 0.20, 2200, -20, "bandpass", 4);
+  noiseBurst(4.25, 0.18, 1500, -20, "bandpass", 4);
 
-  // ---- Phase 5: rate negotiation (descending chirp) ---------------------
+  // ---- Phase 5: rate negotiation (BIOS "RATE NEGOTIATION" 4.35s) --------
 
-  tone(2600, 4.50, 0.35, "triangle", -16, 600);
+  tone(2600, 4.35, 0.35, "triangle", -16, 600);
   // A complementary ascending echo.
-  tone(600, 4.55, 0.30, "triangle", -22, 2200);
+  tone(600, 4.40, 0.30, "triangle", -22, 2200);
 
-  // More plinks during negotiation.
+  // More plinks during negotiation (BIOS "PROTOCOL V.90" at 4.9s).
   const negotFreqs = [2400, 1800, 2600, 2000, 2200];
-  let negT = 4.85;
+  let negT = 4.9;
   for (const f of negotFreqs) {
     tone(f, negT, 0.08, "square", -18);
     negT += 0.06;
   }
 
-  // ---- Phase 6: final connect -------------------------------------------
+  // ---- Phase 6: final connect + data-mode carrier hiss --------------------
+  //
+  // The classic 56k ending: after the negotiation chirps the modem answers
+  // with its two-tone "twang", then the line drops into full-duplex data
+  // mode — a continuous band-passed hiss that carries the LOADING lines
+  // (with a soft crackle tick on each one) and only fades once "PRESS ANY
+  // KEY TO ENTER" appears, so sound and BIOS text end together.
 
-  // Brief low-frequency "thump" — connection established.
-  tone(980, 5.40, 0.30, "sine", -8);
+  // Two-tone "twang" (bong) — connection established, matches the BIOS
+  // "CONNECT 56000" line at 5.4s.
+  tone(2100, 5.40, 0.11, "sine", -8);
+  tone(1650, 5.52, 0.14, "sine", -8);
+  // Low settle thump underneath.
+  tone(980, 5.52, 0.25, "sine", -14);
   // Faint high-frequency confirmation ping.
-  tone(2400, 5.45, 0.15, "sine", -18);
+  tone(2400, 5.55, 0.12, "sine", -18);
 
-  // Dispose all nodes after the handshake completes.
-  const disposeCutoff = 6500;
+  // Data-mode carrier hiss: from right after CONNECT until the "PRESS ANY
+  // KEY" line (~6.85s), with a soft release fade. The amplitude wobble
+  // makes it read as live data transfer, not static.
+  const carrier = new Tone.Noise("white");
+  const carrierFilter = new Tone.Filter(1500, "bandpass");
+  carrierFilter.Q.value = 0.6;
+  const carrierGain = new Tone.Gain(0);
+  carrier.connect(carrierFilter);
+  carrierFilter.connect(carrierGain);
+  carrierGain.connect(masterGain);
+  carrier.start(now + 5.66);
+  carrier.stop(now + 7.75);
+  const hissDb = -30;
+  carrierGain.gain.setValueAtTime(0, now + 5.66);
+  carrierGain.gain.linearRampToValueAtTime(Tone.dbToGain(hissDb), now + 5.95);
+  // Gentle wobble while the LOADING lines type in.
+  carrierGain.gain.linearRampToValueAtTime(Tone.dbToGain(hissDb - 3), now + 6.35);
+  carrierGain.gain.linearRampToValueAtTime(Tone.dbToGain(hissDb + 1), now + 6.7);
+  // Release as "PRESS ANY KEY TO ENTER" appears (~6.85s).
+  carrierGain.gain.setValueAtTime(Tone.dbToGain(hissDb + 1), now + 7.0);
+  carrierGain.gain.linearRampToValueAtTime(0, now + 7.7);
+
+  // Data-burst crackle on each BIOS line after CONNECT — sound tracks text.
+  // (LOADING OBSERVER 5.85s, MACHINE 6.0s, CURATOR 6.15s, ANTHROPIC LINK
+  // 6.35s, THEME 6.55s)
+  for (const at of [5.85, 6.0, 6.15, 6.35, 6.55]) {
+    noiseBurst(at, 0.03, 2600, -26, "highpass", 1);
+  }
+
+  // Line-drop click as the carrier releases.
+  noiseBurst(7.55, 0.05, 700, -24);
+
+  // Dispose all nodes after the carrier has fully faded.
+  const disposeCutoff = 8200;
   setTimeout(() => {
+    carrier.dispose();
+    carrierFilter.dispose();
+    carrierGain.dispose();
     masterGain.dispose();
   }, disposeCutoff);
 }

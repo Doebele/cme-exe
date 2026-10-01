@@ -91,6 +91,20 @@ export class FetchError extends Error {
   }
 }
 
+/**
+ * The target site refuses automated/server-side visitors (bot wall).
+ * Canonical case: LinkedIn returns its proprietary HTTP 999 authwall status
+ * to any non-browser client — regardless of headers — so profile URLs can't
+ * be fetched honestly (no cookie/login spoofing by design).
+ */
+export class TargetBlockedError extends Error {
+  constructor(message = "The target site blocks automated visitors") {
+    super(message);
+    this.name = "TargetBlockedError";
+    this.code = "TARGET_BLOCKED";
+  }
+}
+
 /** Caller has hit the per-IP fetch rate limit. */
 export class RateLimitError extends Error {
   /**
@@ -1091,12 +1105,140 @@ export async function imageToAscii(imageUrl, opts = {}) {
 // ---- Public: fetchAndExtract -----------------------------------------
 
 /**
- * Validate, fetch, and extract content from an external URL.
+ * Hosts that wall off server-side visitors entirely (login walls / bot
+ * walls). For these we skip the live fetch and go straight to the Wayback
+ * Machine — no honest direct path exists, and burning the timeout on a
+ * guaranteed wall just wastes the visitor's rate-limit budget.
+ */
+const KNOWN_WALLED_HOSTS = new Set([
+  "linkedin.com",
+  "www.linkedin.com",
+  "lnkd.in",
+  "instagram.com",
+  "www.instagram.com",
+  "facebook.com",
+  "www.facebook.com",
+  "fb.com",
+  "m.facebook.com",
+  "twitter.com",
+  "x.com",
+  "www.x.com",
+]);
+
+/**
+ * @param {string} host lowercase hostname
+ * @returns {boolean}
+ */
+function isKnownWalledHost(host) {
+  return KNOWN_WALLED_HOSTS.has(host) || KNOWN_WALLED_HOSTS.has(host.replace(/^[^.]+\./, ""));
+}
+
+const WAYBACK_CDX_URL = "https://web.archive.org/cdx/search/cdx";
+// archive.org is slow from server networks (6-8s per CDX answer measured in
+// the container) — the generic 8s fetch timeout truncates legit lookups, so
+// archive requests get their own, roomier budget.
+const WAYBACK_TIMEOUT_MS = 20_000;
+
+/**
+ * Negative cache for snapshot lookups. archive.org's CDX edge rate-limits
+ * hard (intermittent 503/429, roughly a dozen requests/minute per IP), so a
+ * "no snapshot" answer is remembered for 10 minutes — repeat visitors with
+ * the same walled URL don't hammer the archive.
+ * @type {Map<string, number>}
+ */
+const waybackNegativeCache = new Map();
+const WAYBACK_NEGATIVE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Look up the newest Wayback snapshot for a URL via the CDX API.
+ *
+ * The friendlier availability API under-reports walled sites — LinkedIn
+ * profiles often surface only as "warc/revisit" records there and the API
+ * answers with an empty set even though real 200 captures exist. CDX with an
+ * explicit statuscode:200 filter finds them. The snapshot URL uses the `id_`
+ * modifier so the Wayback toolbar is NOT injected into the served HTML.
+ *
+ * @param {string} normalizedUrl
+ * @returns {Promise<{ url: string, timestamp: string } | null>} null when no usable snapshot
+ */
+async function findWaybackSnapshot(normalizedUrl) {
+  const negAt = waybackNegativeCache.get(normalizedUrl);
+  if (negAt && Date.now() - negAt < WAYBACK_NEGATIVE_TTL_MS) return null;
+
+  const cdx =
+    WAYBACK_CDX_URL +
+    "?url=" + encodeURIComponent(normalizedUrl) +
+    "&output=json&filter=statuscode:200&limit=-3&fl=timestamp,original&collapse=digest";
+  // archive.org's CDX edge intermittently answers 503 under load — retry
+  // once with a short backoff, then remember the miss for a while.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { response } = await fetchValidated(
+        cdx,
+        { method: "GET", headers: { "User-Agent": USER_AGENT, Accept: "application/json" } },
+        WAYBACK_TIMEOUT_MS
+      );
+      if (response.status === 503 || response.status === 429) {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2500));
+          continue;
+        }
+        break;
+      }
+      if (!response.ok) break;
+      const rows = await response.json();
+      if (!Array.isArray(rows) || rows.length < 2) break;
+      // limit=-3 returns the LAST 3 captures ascending — take the newest.
+      const last = rows[rows.length - 1];
+      const ts = String(last[0] || "");
+      const original = String(last[1] || "");
+      if (!/^\d{14}$/.test(ts) || !/^https?:\/\//i.test(original)) break;
+      return { url: `https://web.archive.org/web/${ts}id_/${original}`, timestamp: ts };
+    } catch {
+      if (attempt === 1) break; // archive.org down / timeout
+    }
+  }
+  waybackNegativeCache.set(normalizedUrl, Date.now());
+  return null;
+}
+
+/**
+ * Fetch the archived version of a walled URL through the Wayback Machine.
+ * The snapshot URL itself goes through the same SSRF-validated pipeline
+ * (http/https only, public host — web.archive.org), so no new request
+ * surface is opened.
+ *
+ * @param {string} normalizedUrl the original (walled) URL
+ * @returns {Promise<any>} ExtractedContent with origin "archive"
+ * @throws {TargetBlockedError} when no usable snapshot exists
+ */
+async function fetchViaWayback(normalizedUrl) {
+  const snapshot = await findWaybackSnapshot(normalizedUrl);
+  if (!snapshot) {
+    throw new TargetBlockedError(
+      "The target site blocks automated visitors and no archived snapshot was found — paste the page content instead."
+    );
+  }
+  const content = await fetchAndExtractDirect(snapshot.url, WAYBACK_TIMEOUT_MS);
+  // Re-tag provenance: the visitor asked for the original URL; the archive
+  // is just the lens we read it through.
+  content.url = normalizedUrl;
+  content.finalUrl = snapshot.url;
+  content.origin = "archive";
+  content.archivedAt = snapshot.timestamp
+    ? snapshot.timestamp.replace(/^(\d{4})(\d{2})(\d{2}).*/, "$1-$2-$3")
+    : "";
+  return content;
+}
+
+/**
+ * Validate, fetch, and extract content from an external URL — with the
+ * Wayback fallback for bot-walled sites (LinkedIn & co).
  *
  * @param {string} url
  * @param {{ ip?: string }} [opts]
  * @returns {Promise<any>} ExtractedContent
- * @throws {UrlValidationError|BlockedError|FetchTimeoutError|TooLargeError|FetchError|RateLimitError}
+ * @throws {UrlValidationError|BlockedError|FetchTimeoutError|TooLargeError|FetchError|TargetBlockedError|RateLimitError}
  */
 export async function fetchAndExtract(url, opts = {}) {
   const ip = opts && typeof opts.ip === "string" ? opts.ip : "";
@@ -1107,13 +1249,43 @@ export async function fetchAndExtract(url, opts = {}) {
   const cached = readCache(normalizedUrl);
   if (cached) return cached;
 
+  if (isKnownWalledHost(host)) {
+    const content = await fetchViaWayback(normalizedUrl);
+    writeCache(normalizedUrl, content);
+    return content;
+  }
+
+  try {
+    return await fetchAndExtractDirect(normalizedUrl);
+  } catch (err) {
+    if (err instanceof TargetBlockedError) {
+      const content = await fetchViaWayback(normalizedUrl);
+      writeCache(normalizedUrl, content);
+      return content;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Validate, fetch, and extract content from a single URL. No rate limit
+ * (the public {@link fetchAndExtract} owns that), no archive fallback —
+ * fetchViaWayback calls this for the snapshot so the two paths can't loop.
+ *
+ * @param {string} normalizedUrl
+ * @param {number} [timeoutMs=FETCH_TIMEOUT_MS] per-chain fetch budget
+ * @returns {Promise<any>} ExtractedContent
+ */
+async function fetchAndExtractDirect(normalizedUrl, timeoutMs = FETCH_TIMEOUT_MS) {
+  const host = hostnameForLog(normalizedUrl);
+
   let response;
   let finalUrl = normalizedUrl;
   try {
     ({ response, finalUrl } = await fetchValidated(
       normalizedUrl,
       { method: "GET", headers: { "User-Agent": USER_AGENT, Accept: ACCEPT } },
-      FETCH_TIMEOUT_MS
+      timeoutMs
     ));
   } catch (err) {
     // A redirect hop that fails validateUrl() (bad scheme, unresolvable, or
@@ -1127,6 +1299,17 @@ export async function fetchAndExtract(url, opts = {}) {
   }
 
   if (!response.ok) {
+    // HTTP 999 is LinkedIn's anti-bot authwall status (other walls may reuse
+    // it). Browsers pass, every server-side client gets 999 — no honest way
+    // around it, so surface it as its own error instead of a generic failure.
+    if (response.status === 999) {
+      const isLinkedIn = /(^|\.)(linkedin\.com|linkedin\.com\.[a-z]{2}|lnkd\.in)$/i.test(host);
+      throw new TargetBlockedError(
+        isLinkedIn
+          ? "LinkedIn blocks automated visitors (authwall) — profiles can't be read by the Observer."
+          : "The target site blocks automated visitors."
+      );
+    }
     throw new FetchError(`Target returned ${response.status}`);
   }
 
@@ -1232,6 +1415,83 @@ export async function fetchAndExtract(url, opts = {}) {
 
   writeCache(normalizedUrl, content);
   return content;
+}
+
+/**
+ * Build an ExtractedContent-shaped record from pasted plain text (paste
+ * mode for walled pages). Deterministic heuristic, same section/item
+ * contract the URL pipeline produces, so the Observer loop and Stage render
+ * need no special cases:
+ *   - subject.name: explicit title, else the first non-empty line
+ *   - subject.role: the next short non-empty line, if any
+ *   - one "profile" section whose items are the text's blank-line blocks
+ *     (long single blocks are re-chunked every ~15 lines)
+ *
+ * @param {string} text raw pasted content
+ * @param {string} [title] optional explicit subject title
+ * @returns {any} ExtractedContent with origin "paste"
+ * @throws {UrlValidationError} when the text is too short to visit
+ */
+export function extractFromPlainText(text, title) {
+  const raw = String(text || "").replace(/\r\n?/g, "\n").trim();
+  if (raw.length < 80) {
+    throw new UrlValidationError("Pasted text is too short — paste a real profile or page content.");
+  }
+
+  const lines = raw.split("\n").map((l) => l.trim());
+  const nonEmpty = lines.filter(Boolean);
+
+  let name = (title || "").trim();
+  if (!name) {
+    name = nonEmpty[0] || "Pasted subject";
+    if (name.length > 80) name = name.slice(0, 77) + "…";
+  }
+  // Role: the first line that isn't the name — with an explicit title that's
+  // the pasted headline; without, the line after the name.
+  const roleLine = nonEmpty.find((l) => l !== name && l !== title);
+  const role = roleLine && roleLine.length <= 90 ? roleLine : "";
+
+  // Split into blocks on blank lines; re-chunk monster blocks.
+  let blocks = raw
+    .split(/\n[ \t]*\n+/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+  blocks = blocks.flatMap((b) => {
+    const bl = b.split("\n");
+    if (bl.length <= 18) return [b];
+    const out = [];
+    for (let i = 0; i < bl.length; i += 15) out.push(bl.slice(i, i + 15).join("\n").trim());
+    return out.filter(Boolean);
+  });
+  blocks = blocks.slice(0, 12);
+
+  const items = blocks.map((b, i) => {
+    const first = b.split("\n")[0] || `Part ${i + 1}`;
+    const itemTitle = first.length > 60 ? first.slice(0, 57) + "…" : first;
+    const description = b.length > 600 ? b.slice(0, 600) + "…" : b;
+    return { id: `part-${i + 1}`, title: itemTitle, description };
+  });
+
+  return {
+    url: null,
+    finalUrl: null,
+    origin: "paste",
+    title: name,
+    description: (nonEmpty.find((l) => l !== name && l !== role) || "").slice(0, 200),
+    subject: { name, role, location: null, images: [] },
+    // Section ids MUST stay within the observer's fixed section set
+    // (hero|about|works|career|skills — normalizeAction validates against
+    // it), so the pasted blocks live under "works", titled Profile.
+    sections: [
+      { id: "hero", title: name, items: role ? [{ id: "headline", title: role }] : [] },
+      { id: "about", title: "About", items: items.slice(0, 1) },
+      { id: "works", title: "Profile", items },
+    ],
+    fetchedAt: new Date().toISOString(),
+    contentLengthBytes: raw.length,
+    isHtml: false,
+    images: [],
+  };
 }
 
 /**
