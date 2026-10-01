@@ -218,6 +218,12 @@ export async function initAudio(): Promise<void> {
 export function setEnabled(enabled: boolean): void {
   state.enabled = enabled;
   persistEnabled(enabled);
+  if (!enabled) {
+    // Global mute must silence continuous beds too — event sounds gate on
+    // `enabled` per call, but ambient/analysis nodes keep humming otherwise.
+    stopAmbientBed();
+    stopAnalysisNoise();
+  }
   notify();
 }
 
@@ -326,17 +332,21 @@ export function subscribe(cb: (enabled: boolean) => void): () => void {
  */
 export function playBootSound(): void {
   if (!state.enabled) return;
-  // Lazy-init Tone.js on first sound call. If no user gesture is active,
-  // Tone.start() will silently fail and the sound won't play this time —
-  // the next user interaction (click, key) will succeed.
+  // Lazy-init Tone.js on first sound call. The enter-gate click starts
+  // initAudio() concurrently; chain the handshake onto that promise so the
+  // modem sound still plays when the click's Tone.start() hasn't resolved
+  // yet (once unlocked by the gesture, later scheduling is safe).
   if (!state.initialized) {
-    initAudio().catch(() => { /* may fail without user gesture — ok */ });
+    initAudio()
+      .then(() => playBootSound())
+      .catch(() => { /* may fail without user gesture — ok */ });
     return;
   }
   const now = Tone.now();
 
   // Master gain — kept modest so it doesn't drown out the BIOS typewriter.
-  const masterGain = new Tone.Gain(-14);
+  // NOTE: Tone.Gain takes a LINEAR factor (0..1), not dB. -14 dB ≈ 0.2.
+  const masterGain = new Tone.Gain(Tone.dbToGain(-14));
   masterGain.toDestination();
 
   // ---- Helpers -----------------------------------------------------------
@@ -702,14 +712,16 @@ function ensureBgmGraph(): BgmGraph {
 
   const bassSeq = new Tone.Sequence(
     (time, note) => {
-      if (note) bass.triggerAttackRelease(note, "8n", time);
+      // Gate per note so the global sound toggle silences the BGM within one
+      // note and un-muting resumes it mid-run without a restart.
+      if (note && state.enabled) bass.triggerAttackRelease(note, "8n", time);
     },
     [...BGM_BASS],
     "8n",
   );
   const melodySeq = new Tone.Sequence(
     (time, note) => {
-      if (note) melody.triggerAttackRelease(note, "16n", time);
+      if (note && state.enabled) melody.triggerAttackRelease(note, "16n", time);
     },
     [...BGM_MELODY],
     "8n",
@@ -723,10 +735,12 @@ function ensureBgmGraph(): BgmGraph {
 
 /**
  * Starts the chiptune BGM loop via Tone.Transport. Idempotent — repeated
- * calls while already playing are no-ops.
+ * calls while already playing are no-ops. Starts even while muted: the
+ * individual notes gate on the enabled flag, so the loop silently marks time
+ * and becomes audible the moment sound is switched back on mid-run.
  */
 export function startGameBgm(): void {
-  if (!state.enabled || !state.initialized) return;
+  if (!state.initialized) return;
   ensureBgmGraph();
   const transport = Tone.getTransport();
   if (transport.state === "started") return;

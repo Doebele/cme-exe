@@ -1054,12 +1054,16 @@
 .boot-hero-controls {
   position: relative;
   z-index: 2;
+  /* The stage is a min-h-screen flex column with the canvas absolutely
+     positioned behind; the auto margin pushes the controls to the BOTTOM so
+     they stay clear of the fixed navigation overlaying the top. */
+  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  padding: 2rem 1rem 2.5rem;
+  padding: 1rem 1rem 2.5rem;
 }
 
 .boot-hero-btn {
