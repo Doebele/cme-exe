@@ -243,6 +243,9 @@ export function useSketch(): UseSketch {
           systemPrompt,
           messages: [{ role: "user", content: trimmed }],
           visitorApiKey,
+          // Roomy budget: reasoning models spend thinking tokens from the same
+          // cap, and a ~100-line p5 sketch needs the remainder.
+          maxTokens: 4000,
           signal: controller.signal,
           onToken: (text) => {
             acc += text;

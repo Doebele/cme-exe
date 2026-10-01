@@ -11,6 +11,23 @@ const STORAGE_KEY = "cme_exe_api_key";
 const OVERRIDE_KEY = "cme_exe_provider_override";
 
 /**
+ * Fired after every localStorage write below. The native `storage` event
+ * never fires in the tab that made the change (only in *other* tabs), so
+ * every `useApiKey()` instance in this same page — the nav widget, the
+ * intro dialog, admin screens — would otherwise go stale relative to each
+ * other until a reload. This gives same-tab listeners a way to resync too.
+ */
+export const API_KEY_CHANGE_EVENT = "cme-exe-api-key-change";
+
+function notifyApiKeyChanged(): void {
+  try {
+    window.dispatchEvent(new Event(API_KEY_CHANGE_EVENT));
+  } catch {
+    /* non-browser environment — non-fatal */
+  }
+}
+
+/**
  * Static metadata for each provider, used by the visitor widget and the admin
  * tab. `keyPrefixes` is ordered most-specific-first for display; actual
  * detection lives in {@link detectProvider}.
@@ -182,6 +199,7 @@ export function setApiKey(key: string): void {
   } catch {
     /* storage unavailable — non-fatal */
   }
+  notifyApiKeyChanged();
 }
 
 export function clearApiKey(): void {
@@ -190,6 +208,7 @@ export function clearApiKey(): void {
   } catch {
     /* storage unavailable — non-fatal */
   }
+  notifyApiKeyChanged();
 }
 
 /**
@@ -248,6 +267,7 @@ export function setProviderOverride(id: ProviderId | null): void {
   } catch {
     /* storage unavailable — non-fatal */
   }
+  notifyApiKeyChanged();
 }
 
 /**

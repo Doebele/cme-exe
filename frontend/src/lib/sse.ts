@@ -81,6 +81,12 @@ export interface StreamChatOptions {
   systemPrompt: string;
   messages: ChatMessage[];
   visitorApiKey: string | null;
+  /**
+   * Output token budget. Generous on purpose: reasoning models (Kimi K2.x,
+   * DeepSeek-R1, …) spend thinking tokens from the same budget before any
+   * content arrives.
+   */
+  maxTokens?: number;
   signal?: AbortSignal;
   onToken: (text: string) => void;
 }
@@ -95,7 +101,7 @@ const HYBRID_DISABLED_RE = /hybrid mode is disabled/i;
  * caller's AbortSignal fires (rethrows the AbortError).
  */
 export async function streamChat(opts: StreamChatOptions): Promise<void> {
-  const { systemPrompt, messages, visitorApiKey, signal, onToken } = opts;
+  const { systemPrompt, messages, visitorApiKey, maxTokens, signal, onToken } = opts;
   const endpoint = visitorApiKey ? "/api/ai/proxy" : "/api/ai/claude";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -111,7 +117,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
     res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({ systemPrompt, messages, stream: true }),
+      body: JSON.stringify({ systemPrompt, messages, stream: true, maxTokens }),
       signal,
     });
   } catch (err) {

@@ -27,6 +27,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * @property {"openai" | "anthropic" | "gemini"} apiFormat   Which client to use.
  * @property {string} [envVar]          Environment variable for server-configured key.
  * @property {boolean} supportsSystemPrompt   Whether the API accepts system prompts.
+ * @property {boolean} [thinkingDefault]      Model reasons by default and reasoning counts against max_tokens (budget gets bumped).
  * @property {string} [unsupported]     If set, the provider is recognized but cannot be called (message for the visitor).
  */
 
@@ -118,10 +119,16 @@ export const PROVIDERS = {
     label: "Kimi Code",
     keyPrefixes: ["sk-kimi-"],
     baseUrl: "https://api.kimi.ai/coding/v1",
-    defaultModel: null,
+    // Documented alias that always routes to the latest coding model included
+    // in every plan. Never fall back to /models here: the list starts with
+    // entitlement-gated models (k3, *-highspeed) that 401 on lower tiers.
+    defaultModel: "kimi-for-coding",
     apiFormat: "openai",
     envVar: "KIMI_CODE_API_KEY",
     supportsSystemPrompt: true,
+    // K2.x coding models think by default (effort "max") and reasoning tokens
+    // count against max_tokens — small budgets come back with empty content.
+    thinkingDefault: true,
   },
   "zai": {
     id: "zai",
@@ -300,6 +307,23 @@ export async function callProvider(opts) {
   throw new Error(`Unsupported apiFormat: ${cfg.apiFormat}`);
 }
 
+/** Providers whose models emit inline <think>…</think> reasoning blocks. */
+const THINK_BLOCK_RE = /<think>[\s\S]*?<\/think>/g;
+
+/**
+ * Remove inline reasoning blocks some OpenAI-compat models (DeepSeek-R1 style,
+ * Kimi interleaved thinking) mix into content. An unclosed <think> means the
+ * whole response is reasoning — nothing usable remains.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripThinkBlocks(text) {
+  let out = String(text || "").replace(THINK_BLOCK_RE, "");
+  const open = out.lastIndexOf("<think>");
+  if (open !== -1 && out.indexOf("</think>", open) === -1) out = out.slice(0, open);
+  return out.trim();
+}
+
 async function callOpenAICompat({ cfg, apiKey, model: modelIn, systemPrompt, messages, maxTokens, signal }) {
   let model = modelIn;
   const client = new OpenAI({
@@ -307,14 +331,23 @@ async function callOpenAICompat({ cfg, apiKey, model: modelIn, systemPrompt, mes
     baseURL: cfg.baseUrl,
     signal,
   });
-  // No static default (Kimi Code): use the first chat model the key can see.
+  // No static default: use the first chat model the key can see. Prefer ids
+  // that name a chat/coding model — bare lists can start with gated or
+  // non-chat entries.
   if (!model) {
     const list = await client.models.list();
     const ids = [];
     for await (const m of list) ids.push(m.id);
-    model = ids.find((id) => !/embed|tts|whisper|image|moderation|rerank/i.test(id));
+    const chat = ids.filter((id) => !/embed|tts|whisper|image|moderation|rerank/i.test(id));
+    model =
+      chat.find((id) => /chat|coding|instruct/i.test(id)) ||
+      chat[0] ||
+      null;
     if (!model) throw Object.assign(new Error(`${cfg.label}: no chat model available for this key.`), { status: 400 });
   }
+  // Thinking models burn reasoning tokens against the same max_tokens budget;
+  // raise the cap so callers' small budgets (512/1024) don't come back empty.
+  if (cfg.thinkingDefault && maxTokens < 4096) maxTokens = 4096;
   // Cursor's API expects a custom header for auth sometimes; pass through if needed.
   const finalMessages = [];
   if (systemPrompt && cfg.supportsSystemPrompt) {
@@ -327,9 +360,16 @@ async function callOpenAICompat({ cfg, apiKey, model: modelIn, systemPrompt, mes
     messages: finalMessages,
     max_tokens: maxTokens,
   });
-  const choice = completion.choices?.[0]?.message;
+  const choice = completion.choices?.[0];
+  const content = stripThinkBlocks(choice?.message?.content || "");
+  if (!content) {
+    const reason = choice?.finish_reason === "length"
+      ? `${cfg.label}: the model used its entire token budget on reasoning and returned no content.`
+      : `${cfg.label}: the model returned no content.`;
+    throw Object.assign(new Error(reason), { status: 502 });
+  }
   return {
-    text: choice?.content || "",
+    text: content,
     usage: {
       inputTokens: completion.usage?.prompt_tokens ?? 0,
       outputTokens: completion.usage?.completion_tokens ?? 0,

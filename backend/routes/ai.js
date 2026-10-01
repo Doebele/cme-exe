@@ -93,8 +93,14 @@ async function runStream({ res, req, systemPrompt, messages, model, maxTokens, v
   });
 
   let aborted = false;
-  const onClose = () => { aborted = true; };
-  req.on("close", onClose);
+  // Disconnect detection: on modern Node, req's 'close' fires as soon as the
+  // request body stream is consumed — not on client disconnect. Watch the
+  // RESPONSE instead: 'close' before we finished writing means the client
+  // dropped the connection.
+  const onClose = () => {
+    if (!res.writableEnded) aborted = true;
+  };
+  res.on("close", onClose);
 
   try {
     const result = await streamClaude({
@@ -115,7 +121,7 @@ async function runStream({ res, req, systemPrompt, messages, model, maxTokens, v
     const message = sanitizeForClient(err);
     if (!aborted) sse(res, "error", { message });
   } finally {
-    req.off("close", onClose);
+    res.off("close", onClose);
     try { res.end(); } catch { /* already closed */ }
   }
 }

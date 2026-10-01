@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import BootSection from "./sections/BootSection";
@@ -7,6 +7,11 @@ import SpeedrunSection from "./sections/SpeedrunSection";
 import SketchSection from "./sections/SketchSection";
 import QuestSection from "./sections/QuestSection";
 import BootSequence from "./components/BootSequence";
+import ApiKeyIntroDialog, {
+  isKeyPromptDismissed,
+  markKeyPromptDismissed,
+} from "./components/ApiKeyIntroDialog";
+import { useApiKey } from "./hooks/useApiKey";
 
 type BootMode = "always" | "first-visit" | "off";
 
@@ -19,8 +24,6 @@ const BOOTED_KEY = "cme_exe_booted";
 // Module-scope cache so the boot-mode probe runs at most once per session.
 let cachedBootMode: BootMode | null = null;
 let bootModePromise: Promise<BootMode> | null = null;
-// Guard: ensures the boot-mode effect fires at most once even under StrictMode.
-let bootModeResolved = false;
 
 function fetchBootMode(): Promise<BootMode> {
   if (cachedBootMode) return Promise.resolve(cachedBootMode);
@@ -51,16 +54,47 @@ function shouldBootInitially(mode: BootMode): boolean {
 
 export default function Lab() {
   const [booting, setBooting] = useState<boolean>(false);
+  // True once the boot-mode probe settled, so the key prompt doesn't fire
+  // while the boot overlay may still be about to start.
+  const [bootCheckDone, setBootCheckDone] = useState<boolean>(false);
+  const [keyPromptOpen, setKeyPromptOpen] = useState<boolean>(false);
+  const bootedThisLoad = useRef(false);
+  const { hasKey } = useApiKey();
 
-  // Resolve initial boot state from settings. Uses a module-level guard so
-  // StrictMode's double-invoke is harmless — booting is set at most once.
+  // Resolve initial boot state from settings. StrictMode-safe via the mount
+  // cleanup (the probe itself is module-cached).
   useEffect(() => {
-    if (bootModeResolved) return;
-    bootModeResolved = true;
+    let active = true;
     void fetchBootMode().then((mode) => {
+      if (!active) return;
       if (shouldBootInitially(mode)) setBooting(true);
+      setBootCheckDone(true);
     });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  // Remember whether a boot sequence ran this load — the key prompt timing
+  // differs (right after the sequence vs. a calmer delay on later visits).
+  useEffect(() => {
+    if (booting) bootedThisLoad.current = true;
+  }, [booting]);
+
+  // Once the intro is on screen (boot finished, or no boot this load), invite
+  // keyless visitors to connect a model. Once per session until a key exists.
+  useEffect(() => {
+    if (!bootCheckDone || booting || hasKey || keyPromptOpen) return;
+    if (isKeyPromptDismissed()) return;
+    const delay = bootedThisLoad.current ? 900 : 1800;
+    const t = window.setTimeout(() => setKeyPromptOpen(true), delay);
+    return () => window.clearTimeout(t);
+  }, [bootCheckDone, booting, hasKey, keyPromptOpen]);
+
+  const closeKeyPrompt = () => {
+    markKeyPromptDismissed();
+    setKeyPromptOpen(false);
+  };
 
   // Replay button (in Footer) dispatches a custom event to re-trigger boot
   // regardless of the cme_exe_booted flag.
@@ -92,6 +126,7 @@ export default function Lab() {
   return (
     <div className="min-h-screen flex flex-col">
       {booting && <BootSequence onDone={() => setBooting(false)} />}
+      {keyPromptOpen && !hasKey && <ApiKeyIntroDialog onClose={closeKeyPrompt} />}
       <Navigation />
       <main className="flex-1">
         <BootSection />

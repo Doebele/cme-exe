@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AiProvider } from "../types";
 import type { ProviderId } from "../lib/apiKey";
 import {
+  API_KEY_CHANGE_EVENT,
   clearApiKey,
   detectProvider,
   getApiKey,
@@ -49,15 +50,25 @@ function readState(): {
 export function useApiKey(): UseApiKey {
   const [state, setState] = useState(readState);
 
-  // Stay in sync if the key or override changes in another tab/window.
+  // Stay in sync if the key or override changes elsewhere: `storage` covers
+  // other tabs/windows (it never fires in the tab that made the write), and
+  // API_KEY_CHANGE_EVENT covers other useApiKey() instances in *this* tab
+  // (the nav widget, the intro dialog, admin screens — each has its own
+  // local state, so a save in one wouldn't otherwise be seen by the others
+  // until a reload).
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === "cme_exe_api_key" || e.key === "cme_exe_provider_override") {
         setState(readState());
       }
     };
+    const onLocalChange = () => setState(readState());
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(API_KEY_CHANGE_EVENT, onLocalChange);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(API_KEY_CHANGE_EVENT, onLocalChange);
+    };
   }, []);
 
   const save = useCallback((value: string): ProviderId | null => {

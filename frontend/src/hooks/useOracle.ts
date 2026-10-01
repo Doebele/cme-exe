@@ -123,6 +123,9 @@ export function useOracle(): UseOracle {
         systemPrompt,
         messages: [{ role: "user", content: trimmed }],
         visitorApiKey,
+        // Answers are short, but reasoning models spend thinking tokens from
+        // the same budget before any answer text arrives.
+        maxTokens: 2048,
         signal: controller.signal,
         onToken: (text) => {
           acc += text;
