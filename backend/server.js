@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express from "express";
-import cors from "cors";
 import session from "express-session";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -31,7 +30,14 @@ const SESSION_SECRET =
 
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
+// No CORS middleware: the frontend only ever talks to this API same-origin
+// (Vite's dev proxy forwards /api to this server, and in production both
+// are served from this same Express app) — so the browser never needs a
+// cross-origin credentialed request to succeed. Reflecting any Origin with
+// credentials enabled (the previous config) had no legitimate use and was
+// the enabler of a cross-site request forgery path against admin routes
+// (security finding); removing it closes that path outright rather than
+// trying to get an allow-list exactly right.
 app.use(express.json({ limit: "1mb" }));
 // Trust the reverse proxy (Nginx) so req.protocol reflects the original
 // scheme (https) rather than the internal plain-HTTP hop.
@@ -44,8 +50,10 @@ app.use(
     saveUninitialized: false,
     // auto: the cookie is marked Secure only when the connection is HTTPS.
     // This fixes sessions on localhost HTTP (NODE_ENV=production but no TLS)
-    // while still securing cookies on the live HTTPS deployment.
-    cookie: { secure: "auto", maxAge: 24 * 60 * 60 * 1000 },
+    // while still securing cookies on the live HTTPS deployment. sameSite is
+    // set explicitly rather than left to the browser's implicit default, as
+    // defense-in-depth alongside removing the permissive CORS config above.
+    cookie: { secure: "auto", sameSite: "lax", maxAge: 24 * 60 * 60 * 1000 },
   })
 );
 

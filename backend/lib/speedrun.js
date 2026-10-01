@@ -237,16 +237,26 @@ export async function buildPageState(run) {
 
 // ---- Run persistence --------------------------------------------------
 
+/** Every run id this app issues matches this shape (see startRun/startUrlRun). */
+const RUN_ID_RE = /^r-[a-z0-9]{12}$/;
+
 function runFile(runId) {
   return join(RUNS_DIR, `${runId}.json`);
 }
 
 /**
- * Load a run record. Returns null when missing. Lazily deletes expired runs.
+ * Load a run record. Returns null when missing or when runId isn't a real
+ * run id (security: this is the one shared chokepoint every caller routes
+ * through before touching the filesystem below, including the unlink() on
+ * the expired-run path — validating here, not just at individual call
+ * sites, closes a path-traversal hole where an admin route passed an
+ * unvalidated runId straight through and could be made to delete arbitrary
+ * JSON files, e.g. runId="../api-keys"). Lazily deletes expired runs.
  * @param {string} runId
  * @returns {Promise<object|null>}
  */
 export async function getRun(runId) {
+  if (typeof runId !== "string" || !RUN_ID_RE.test(runId)) return null;
   const record = await readJson(runFile(runId));
   if (!record) return null;
   const age = Date.now() - new Date(record.startedAt || record.createdAt || 0).getTime();

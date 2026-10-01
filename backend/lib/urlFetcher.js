@@ -34,6 +34,7 @@ const ASCII_RAMP = " .:-=+*#%@";
 // declare a huge width/height and force a multi-gigabyte decode allocation
 // (security finding: PNG dimension bomb) before any real pixel data is read.
 const MAX_IMAGE_PIXELS = 4_000_000; // ~4 MP
+const MAX_REDIRECTS = 3;
 const EXTRACTION_TIME_BUDGET_MS = 200; // wall-clock budget for HTML-extraction passes
 
 const CACHE_TTL_MS = 60 * 60 * 1_000; // 60 min
@@ -307,6 +308,47 @@ async function validateUrl(rawUrl) {
   parsed.username = "";
   parsed.password = "";
   return { url: parsed.toString(), host };
+}
+
+/**
+ * Fetch `url`, following redirects manually and re-running the full
+ * validateUrl() check (private-IP/DNS validation) on every hop's target
+ * before following it. `redirect:"follow"` would transparently fetch
+ * whatever Location header a first-hop-public, attacker-controlled server
+ * sends back -- including a private/internal address -- since validateUrl()
+ * only ever checked the original hostname (security finding: SSRF via
+ * unvalidated redirect). A single timeout covers the whole chain, not each
+ * hop, so a malicious multi-hop chain can't use up more than one request's
+ * time budget.
+ *
+ * ponytail: the DNS lookup here and the one fetch() performs internally at
+ * connect time are still two independent resolutions (no IP pinning), so a
+ * DNS-rebinding attacker controlling their own authoritative DNS with a
+ * short TTL could in principle still swap the address between the two --
+ * closing that needs pinning the validated IP for the actual connection
+ * (e.g. via a custom undici dispatcher `connect.lookup`), which is a bigger,
+ * riskier change than this fix. The redirect bypass this closes was the
+ * confirmed, trivially-exploitable vector; rebinding needs attacker-
+ * controlled authoritative DNS and precise timing, a materially higher bar.
+ *
+ * @param {string} url
+ * @param {RequestInit} fetchOpts
+ * @param {number} timeoutMs
+ * @returns {Promise<{ response: Response, finalUrl: string }>}
+ * @throws {UrlValidationError|BlockedError}
+ */
+async function fetchValidated(url, fetchOpts, timeoutMs) {
+  const signal = AbortSignal.timeout(timeoutMs);
+  let currentUrl = (await validateUrl(url)).url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const response = await fetch(currentUrl, { ...fetchOpts, redirect: "manual", signal });
+    const isRedirect = response.status >= 300 && response.status < 400;
+    const location = isRedirect ? response.headers.get("location") : null;
+    if (!location) return { response, finalUrl: currentUrl };
+    const nextUrl = new URL(location, currentUrl).toString();
+    currentUrl = (await validateUrl(nextUrl)).url; // re-validate EVERY hop, not just the first
+  }
+  throw new UrlValidationError("Too many redirects");
 }
 
 // ---- Per-IP fetch rate limiter (in-memory) ---------------------------
@@ -991,13 +1033,11 @@ export async function imageToAscii(imageUrl, opts = {}) {
   try {
     const result = await Promise.race([
       (async () => {
-        const { url: normalizedUrl } = await validateUrl(imageUrl);
-        const response = await fetch(normalizedUrl, {
-          method: "GET",
-          redirect: "follow",
-          headers: { "User-Agent": USER_AGENT },
-          signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-        });
+        const { response } = await fetchValidated(
+          imageUrl,
+          { method: "GET", headers: { "User-Agent": USER_AGENT } },
+          IMAGE_FETCH_TIMEOUT_MS
+        );
         if (!response.ok) return null;
         const contentType = response.headers.get("content-type") || "";
         const chunks = [];
@@ -1057,17 +1097,19 @@ export async function fetchAndExtract(url, opts = {}) {
   if (cached) return cached;
 
   let response;
+  let finalUrl = normalizedUrl;
   try {
-    response = await fetch(normalizedUrl, {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: ACCEPT,
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    ({ response, finalUrl } = await fetchValidated(
+      normalizedUrl,
+      { method: "GET", headers: { "User-Agent": USER_AGENT, Accept: ACCEPT } },
+      FETCH_TIMEOUT_MS
+    ));
   } catch (err) {
+    // A redirect hop that fails validateUrl() (bad scheme, unresolvable, or
+    // a private address) throws UrlValidationError/BlockedError directly --
+    // let those through as-is rather than masking them as a generic fetch
+    // failure, same as the original (unvalidated) hostname would.
+    if (err instanceof UrlValidationError || err instanceof BlockedError) throw err;
     const name = err && err.name;
     if (name === "TimeoutError" || name === "AbortError") throw new FetchTimeoutError();
     throw new FetchError(`Could not fetch URL (${host})`);
@@ -1121,7 +1163,7 @@ export async function fetchAndExtract(url, opts = {}) {
     // Best-effort: still return a minimal record for non-HTML responses.
     const minimal = assembleContent({
       url: normalizedUrl,
-      finalUrl: response.url || normalizedUrl,
+      finalUrl,
       titleTag: "",
       description: "",
       h1s: [], h2s: [], h3s: [], paragraphs: [], links: [],
@@ -1147,7 +1189,7 @@ export async function fetchAndExtract(url, opts = {}) {
 
   const content = assembleContent({
     url: normalizedUrl,
-    finalUrl: response.url || normalizedUrl,
+    finalUrl,
     titleTag,
     description,
     h1s, h2s, h3s, paragraphs, links,

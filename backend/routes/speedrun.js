@@ -296,21 +296,25 @@ router.post("/url/start", ash(async (req, res) => {
     return res.status(blocked.status).json(blocked.body);
   }
 
-  // Tighter rate limit for URL-run starts (5/h/IP, Full mode exempt).
-  if (!visitorApiKey) {
-    const rl = rateLimit({
-      key: `speedrun-url-start:${req.ip}`,
-      limit: URL_START_LIMIT_PER_HOUR,
-      windowMs: HOUR_MS,
+  // Tighter rate limit for URL-run starts (5/h/IP). Applied unconditionally,
+  // including Full mode: a visitor key only determines whose key pays for
+  // the LLM narration calls later, it doesn't change the cost/risk of the
+  // URL-fetch pipeline itself (SSRF surface, HTML-parsing CPU, image-decode
+  // memory) — and validateVisitorKey() only checks key *format*, not that it
+  // actually works, so exempting Full mode let a fabricated key skip this
+  // limiter entirely (security finding).
+  const rl = rateLimit({
+    key: `speedrun-url-start:${req.ip}`,
+    limit: URL_START_LIMIT_PER_HOUR,
+    windowMs: HOUR_MS,
+  });
+  if (!rl.allowed) {
+    res.set("Retry-After", String(Math.ceil(rl.retryAfterMs / 1000)));
+    return res.status(429).json({
+      error: "Too many URL speedruns",
+      retryAfterSec: Math.ceil(rl.retryAfterMs / 1000),
+      code: "RATE_LIMIT",
     });
-    if (!rl.allowed) {
-      res.set("Retry-After", String(Math.ceil(rl.retryAfterMs / 1000)));
-      return res.status(429).json({
-        error: "Too many URL speedruns",
-        retryAfterSec: Math.ceil(rl.retryAfterMs / 1000),
-        code: "RATE_LIMIT",
-      });
-    }
   }
 
   try {
