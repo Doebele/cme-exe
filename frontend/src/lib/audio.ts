@@ -196,6 +196,12 @@ export async function initAudio(): Promise<void> {
   if (state.initializing) return state.initializing;
 
   const promise = (async () => {
+    // iOS Safari mutes Web Audio while the hardware silent switch is on
+    // unless the page declares itself "playback" media (iOS 16.4+).
+    try {
+      const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = "playback";
+    } catch { /* unsupported — non-fatal */ }
     await Tone.start();
     const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: "sine" },
@@ -213,6 +219,22 @@ export async function initAudio(): Promise<void> {
   } finally {
     state.initializing = null;
   }
+}
+
+// Mobile browsers only unlock audio on touchend/click/keydown — NOT on
+// pointerdown/touchstart, which is what the boot enter-gate listens to. A
+// Tone.start() fired there stays pending forever, so (re)try on every
+// unlocking gesture until the context is actually running.
+if (typeof window !== "undefined") {
+  const UNLOCK_EVENTS = ["touchend", "click", "keydown"] as const;
+  const unlock = () => {
+    if (Tone.getContext().state === "running") {
+      for (const e of UNLOCK_EVENTS) window.removeEventListener(e, unlock, true);
+      return;
+    }
+    Tone.start().catch(() => { /* retried on next gesture */ });
+  };
+  for (const e of UNLOCK_EVENTS) window.addEventListener(e, unlock, true);
 }
 
 export function setEnabled(enabled: boolean): void {
