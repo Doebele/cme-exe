@@ -142,6 +142,14 @@ const IPV4_PRIVATE = [
   { base: (ipv4ToInt("169.254.0.0") & ipv4Mask(16)) >>> 0, mask: ipv4Mask(16) }, // 169.254.0.0/16
   { base: (ipv4ToInt("0.0.0.0") & ipv4Mask(8)) >>> 0, mask: ipv4Mask(8) }, // 0.0.0.0/8
   { base: (ipv4ToInt("100.64.0.0") & ipv4Mask(10)) >>> 0, mask: ipv4Mask(10) }, // 100.64.0.0/10 (CGN)
+  // Less-common reserved/special-purpose ranges (RFC 5735/6890) — low
+  // practical SSRF risk (nothing sensitive is expected to live here), but
+  // cheap to close alongside the ranges above (security hardening note).
+  { base: (ipv4ToInt("192.0.0.0") & ipv4Mask(24)) >>> 0, mask: ipv4Mask(24) }, // 192.0.0.0/24 (IETF protocol assignments)
+  { base: (ipv4ToInt("192.88.99.0") & ipv4Mask(24)) >>> 0, mask: ipv4Mask(24) }, // 192.88.99.0/24 (6to4 relay anycast)
+  { base: (ipv4ToInt("198.18.0.0") & ipv4Mask(15)) >>> 0, mask: ipv4Mask(15) }, // 198.18.0.0/15 (benchmarking)
+  { base: (ipv4ToInt("224.0.0.0") & ipv4Mask(4)) >>> 0, mask: ipv4Mask(4) }, // 224.0.0.0/4 (multicast)
+  { base: (ipv4ToInt("240.0.0.0") & ipv4Mask(4)) >>> 0, mask: ipv4Mask(4) }, // 240.0.0.0/4 (reserved + 255.255.255.255 broadcast)
 ];
 
 /**
@@ -212,6 +220,9 @@ const IPV6_PRIVATE = [
   { groups: [0xfc00, 0, 0, 0, 0, 0, 0, 0], mask: 7 },
   // fe80::/10
   { groups: [0xfe80, 0, 0, 0, 0, 0, 0, 0], mask: 10 },
+  // Less-common reserved ranges — same rationale as the IPv4 additions above.
+  { groups: [0x2001, 0x0db8, 0, 0, 0, 0, 0, 0], mask: 32 }, // 2001:db8::/32 (documentation)
+  { groups: [0xff00, 0, 0, 0, 0, 0, 0, 0], mask: 8 }, // ff00::/8 (multicast)
 ];
 
 /**
