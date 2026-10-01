@@ -453,6 +453,16 @@
   font-size: 0.82rem;
 }
 
+/* Flex children default to min-width:auto (content-based), so a long
+   unbroken error string (e.g. a raw upstream API error) was forcing this
+   row wider than the terminal instead of wrapping — overflowing off-screen
+   on mobile. min-width:0 lets it shrink to the flex row's actual width so
+   overflow-wrap can do its job. */
+.oracle-error span {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .oracle-error__retry {
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 50%, transparent);
