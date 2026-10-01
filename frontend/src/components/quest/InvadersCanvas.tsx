@@ -205,7 +205,23 @@ function makeFormation(view: ViewSize, level: number): {
 } {
   const formationW = COLS * (INVADER_W + INVADER_GAP_X) - INVADER_GAP_X;
   const originX = Math.max(20, (view.w - formationW) / 2);
-  const originY = Math.max(40, Math.min(110, 40 + level * 6));
+  // originY is tuned as a fixed pixel offset assuming a reasonably tall
+  // canvas (desktop: .quest-canvas-frame's 5:3 aspect ratio at typical
+  // widths gives 400px+). On a narrow mobile viewport the same aspect
+  // ratio yields a much shorter canvas (~200px), so the untouched formula
+  // below could place the formation's bottom row already past the
+  // game-over threshold on the very first frame -- an instant, unplayable
+  // loss. Clamp originY so the formation always starts with at least
+  // MIN_MARCH_ROOM of clearance above the actual danger line for this
+  // canvas's real height, regardless of aspect ratio or screen size. On
+  // any canvas tall enough for the original tuning this clamp never
+  // engages (maxOriginY comfortably exceeds 110), so desktop behavior is
+  // unchanged.
+  const MIN_MARCH_ROOM = 120;
+  const formationH = (ROWS - 1) * (INVADER_H + INVADER_GAP_Y) + INVADER_H;
+  const dangerY = view.h - PLAYER_Y_OFFSET - PLAYER_H / 2;
+  const maxOriginY = Math.max(10, dangerY - MIN_MARCH_ROOM - formationH);
+  const originY = Math.max(10, Math.min(maxOriginY, Math.min(110, 40 + level * 6)));
   const invaders: Invader[] = [];
   let id = 1;
   for (let r = 0; r < ROWS; r++) {
