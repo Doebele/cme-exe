@@ -868,6 +868,12 @@
   color: var(--color-accent-secondary);
   font-family: var(--font-display);
   font-size: 0.82rem;
+  /* A raw upstream API error is minified JSON — long unspaced runs (keys,
+     request ids) have no normal word-wrap break opportunity and pushed the
+     whole page into horizontal scroll on mobile. Same underlying problem
+     as .oracle-error, different cause (no wrap-point vs flex min-width). */
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .sketch-code {
